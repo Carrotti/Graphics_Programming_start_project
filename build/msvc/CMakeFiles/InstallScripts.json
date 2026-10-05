@@ -1,0 +1,11 @@
+{
+	"Configs" : 
+	[
+		"Debug"
+	],
+	"InstallScripts" : 
+	[
+		"C:/Users/waute/Documents/DAE/Graphics_Programming_1/start_project/build/msvc/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
