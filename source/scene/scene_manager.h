@@ -13,6 +13,7 @@
 #include <matrix.h>
 #include <texture.h>
 #include <factory.h>
+#include <intersections.h>
 
 namespace gfx
 {
@@ -26,22 +27,22 @@ namespace gfx
 	struct EnvironmentMap final
 	{
 		Texture texture;
-		float intensity {1.f};
-		float rotation_degrees {0.f};
-		bool flip_horizontal {false};
+		float intensity{ 1.f };
+		float rotation_degrees{ 0.f };
+		bool flip_horizontal{ false };
 	};
 
 	struct Scene
 	{
-		Factory<Primitive> primitives_factory { Factory<Primitive>() };
-		Factory<Material> materials_factory { Factory<Material>() };
-		Factory<Texture> textures_factory { Factory<Texture>() };
-		Factory<Light> lights_factory { Factory<Light>() };
-		std::vector<SceneObject> objects { };
-		Camera camera { };
-		ColorRgba background_color { ColorRgba::Black() };
-		std::optional<EnvironmentMap> environment_map { };
-		bool scene_changed { true };
+		Factory<Primitive> primitives_factory{ Factory<Primitive>() };
+		Factory<Material> materials_factory{ Factory<Material>() };
+		Factory<Texture> textures_factory{ Factory<Texture>() };
+		Factory<Light> lights_factory{ Factory<Light>() };
+		std::vector<SceneObject> objects{ };
+		Camera camera{ };
+		ColorRgba background_color{ ColorRgba::Black() };
+		std::optional<EnvironmentMap> environment_map{ };
+		bool scene_changed{ true };
 
 		Scene() = default;
 		virtual ~Scene() = default;
@@ -72,6 +73,78 @@ namespace gfx
 						static_cast<const TriangleMesh*>(p)->indices.size() / 3);
 			}
 			return count;
+		}
+
+		bool SceneClosestHitTest(const Ray& ray,
+			RayHitRecord& closest_hit, bool ignore_record = false) const
+		{
+			(void)ignore_record;
+			bool did_hit{ false };
+			for (int object_index{ 0 }; object_index < objects.size(); object_index++)
+			{
+				const SceneObject& object{ objects[object_index] };
+				Primitive* prim{ primitives_factory.Get(object.primitive_index) };
+				if (prim == nullptr) continue;
+
+				RayHitRecord candidate_closest_hit{};
+				switch (prim->type)
+				{
+				case PrimitiveType::kSphere:
+				{
+					Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
+					if (!HitTestSphere(*sphere, ray, candidate_closest_hit)) continue;
+					break;
+				}
+				case PrimitiveType::kPlane:
+				{
+					Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
+					if (!HitTestPlane(*plane, ray, candidate_closest_hit)) continue;
+					break;
+				}
+				default:
+					//unhandled case
+					continue;
+				}
+				did_hit = true;
+				if (candidate_closest_hit.t < closest_hit.t)
+				{
+					closest_hit.t = candidate_closest_hit.t;
+					closest_hit.ray = ray;
+					closest_hit.object_index = object_index;
+				}
+			}
+			return did_hit;
+		}
+
+		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const
+		{
+			ShadingInput shading_input{};
+
+
+			const Ray& ray{ hit.ray };
+			shading_input.view_direction = ray.direction.Normalized();//IDK
+			shading_input.world_position = ray.origin + ray.direction * hit.t;
+
+			const Primitive* prim{ primitives_factory.Get(hit.object_index) };
+			switch (prim->type)
+			{
+			case PrimitiveType::kSphere:
+			{
+				Sphere* sphere{ primitives_factory.GetAs<Sphere>(hit.object_index) };
+				shading_input.world_normal = (shading_input.world_position - sphere->origin).Normalized();
+				break;
+			}
+			case PrimitiveType::kPlane:
+			{
+				Plane* plane{ primitives_factory.GetAs<Plane>(hit.object_index) };
+				shading_input.world_normal = plane->normal;
+				break;
+			}
+			default:
+				//unhandled case
+				break;
+			}
+			return shading_input;
 		}
 	};
 

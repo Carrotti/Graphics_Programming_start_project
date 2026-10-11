@@ -26,14 +26,16 @@ void SoftwarePathTracer::Render()
 
 	const SurfaceInfo& surface_info = context_->surface_info;
 
-
-	const Sphere test_sphere{ {0.f,0.f,100.f }, 50.f };
-	const Plane test_plane{ 
-		{0.f,-50.f,0.f},
-		{0.f,1.f,0.f},
-		true,
-		Vector2{100.f,100.f}
-	};
+	BasicScene basic_scene{};
+	basic_scene.Setup();
+	/*
+		const Sphere test_sphere{ {0.f,0.f,100.f }, 50.f };
+		const Plane test_plane{
+			{0.f,-50.f,0.f},
+			{0.f,1.f,0.f},
+			true,
+			Vector2{100.f,100.f}
+		};*/
 	const float aspect_ratio{ static_cast<float>(surface_info.width) / surface_info.height };
 
 	for (uint32_t py{ 0 }; py < surface_info.height; ++py)
@@ -42,6 +44,7 @@ void SoftwarePathTracer::Render()
 		{
 			if (px == surface_info.width / 2 && py == surface_info.height / 2)
 			{
+				continue;
 				//middle pixel breakpoint spot
 			}
 			//calculate NDC
@@ -49,29 +52,17 @@ void SoftwarePathTracer::Render()
 			float y_ndc{ 1.f - (2.f * (py + 0.5f) / surface_info.height) };
 			Vector3 ray_direction{ x_ndc, y_ndc, 1 };
 			ray_direction.Normalize();
-			const Ray view_ray{ {0.f, 0.f,0.f}, ray_direction };
+			const Ray view_ray{ basic_scene.camera.GetPosition(), ray_direction };
 
 
 			RayHitRecord closest_hit_record{};
-			
-			bool did_hit{ HitTestPlane(test_plane,view_ray,closest_hit_record) };
-			//bool did_hit{ HitTestSphere(test_sphere, view_ray, closest_hit_record) };
-
 			ShadingInput shading_input{};
-
-			Vector3 hit_position{ view_ray.origin + view_ray.direction * closest_hit_record.t };
-			shading_input.world_position = hit_position;
-			shading_input.world_normal = test_plane.normal.Normalized();
-
-
 			ColorRgba final_color{};
 
-			if (!did_hit)
+			bool did_hit{ basic_scene.SceneClosestHitTest(view_ray,closest_hit_record) };
+			if (did_hit)
 			{
-				final_color = { 0,0,0 };
-			}
-			else
-			{
+				shading_input = basic_scene.ConstructShadingInput(closest_hit_record);
 				switch (context_->debug_params.visualization_mode)
 				{
 				case VisualizationMode::kDepth:
@@ -81,14 +72,18 @@ void SoftwarePathTracer::Render()
 					final_color = {
 						scaled_t, scaled_t, scaled_t
 					};
+					break;
 				}
-				break;
 				case VisualizationMode::kNone:
+				{
+					const uint32_t idx{ closest_hit_record.object_index };
 					final_color = {
-						1.f,0.f,0.f
+						static_cast<float>(idx & 1), static_cast<float>((idx >> 1) & 1), static_cast<float>((idx >> 2) & 1)
 					};
 					break;
+				}
 				case VisualizationMode::kNormals:
+				{
 					const Vector3& n = shading_input.world_normal;
 					final_color = {
 						(n.x + 1.f) * 0.5f,
@@ -97,6 +92,11 @@ void SoftwarePathTracer::Render()
 					};
 					break;
 				}
+				}
+			}
+			else
+			{
+				final_color = basic_scene.background_color;
 			}
 
 			final_color.MaxToOne();
