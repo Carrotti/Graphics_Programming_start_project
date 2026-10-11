@@ -361,3 +361,27 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+build/msvc/.cmake/api/v1/reply/cache-v2-5f0842a182efe3119a08.json
+build/msvc/.cmake/api/v1/reply/cache-v2-a81189f0e2f9301918a1.json
+build/msvc/.cmake/api/v1/reply/cmakeFiles-v1-6ed2743d0ac70edcef24.json
+build/msvc/.cmake/api/v1/reply/cmakeFiles-v1-a57794817c9dcc41d1bd.json
+build/msvc/.cmake/api/v1/reply/index-2026-09-25T10-13-03-0278.json
+build/msvc/.cmake/api/v1/reply/index-2026-10-11T18-15-28-0658.json
+build/msvc/.cmake/api/v1/reply/toolchains-v1-61393e8699d2f460cea7.json
+build/msvc/.cmake/api/v1/reply/toolchains-v1-8125a68c72123a806eff.json
+build/msvc/.ninja_deps
+build/msvc/.ninja_log
+build/msvc/CMakeCache.txt
+build/msvc/CMakeFiles/CMakeConfigureLog.yaml
+build/msvc/CMakeFiles/common.ninja
+build/msvc/.cmake/api/v1/reply/cache-v2-5f0842a182efe3119a08.json
+build/msvc/.cmake/api/v1/reply/cmakeFiles-v1-a57794817c9dcc41d1bd.json
+build/msvc/.cmake/api/v1/reply/index-2026-09-25T10-13-03-0278.json
+build/msvc/.cmake/api/v1/reply/toolchains-v1-61393e8699d2f460cea7.json
+build/msvc/.ninja_deps
+build/msvc/.ninja_log
+build/msvc/CMakeCache.txt
+build/msvc/CMakeFiles/CMakeConfigureLog.yaml
+build/msvc/CMakeFiles/common.ninja
+build/msvc/.cmake/api/v1/reply/cache-v2-5f0842a182efe3119a08.json
+/build/msvc
