@@ -26,8 +26,6 @@ void SoftwarePathTracer::Render()
 
 	const SurfaceInfo& surface_info = context_->surface_info;
 
-	BasicScene basic_scene{};
-	basic_scene.Setup();
 	/*
 		const Sphere test_sphere{ {0.f,0.f,100.f }, 50.f };
 		const Plane test_plane{
@@ -37,7 +35,9 @@ void SoftwarePathTracer::Render()
 			Vector2{100.f,100.f}
 		};*/
 	const float aspect_ratio{ static_cast<float>(surface_info.width) / surface_info.height };
-	const float alpha{ basic_scene.camera.GetFovAngle() * std::numbers::pi_v<float> / 180.f};
+	Scene* active_scene{ context_->scene_manager->GetActiveScene() };
+	active_scene->camera.SetFovAngle(90);
+	const float alpha{ active_scene->camera.GetFovAngle() * std::numbers::pi_v<float> / 180.f};
 	const float FOV{ tanf(alpha / 2.f) };
 
 	for (uint32_t py{ 0 }; py < surface_info.height; ++py)
@@ -53,17 +53,18 @@ void SoftwarePathTracer::Render()
 			float x_ndc{ ((2.f * (px + 0.5f) / surface_info.width) - 1.f) * aspect_ratio * FOV };
 			float y_ndc{ 1.f - (2.f * (py + 0.5f) / surface_info.height) * FOV };
 			Vector3 ray_direction{ x_ndc, y_ndc, 1 };
-			const Ray view_ray{ basic_scene.camera.GetPosition(), ray_direction.Normalized()};
+			const Matrix& camera_view{ active_scene->camera.GetView() };
+			const Ray view_ray{ active_scene->camera.GetPosition(), camera_view.TransformVector(ray_direction.Normalized())};
 
 
 			RayHitRecord closest_hit_record{};
 			ShadingInput shading_input{};
 			ColorRgba final_color{};
 
-			bool did_hit{ basic_scene.SceneClosestHitTest(view_ray,closest_hit_record) };
+			bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
 			if (did_hit)
 			{
-				shading_input = basic_scene.ConstructShadingInput(closest_hit_record);
+				shading_input = active_scene->ConstructShadingInput(closest_hit_record);
 				switch (context_->debug_params.visualization_mode)
 				{
 				case VisualizationMode::kDepth:
@@ -97,7 +98,7 @@ void SoftwarePathTracer::Render()
 			}
 			else
 			{
-				final_color = basic_scene.background_color;
+				final_color = active_scene->background_color;
 			}
 
 			final_color.MaxToOne();

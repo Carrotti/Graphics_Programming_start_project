@@ -246,6 +246,9 @@ int main(int, char**)
 	#elif defined(HARDWARE_RASTERIZER)
 	#endif
 
+	//MY EDIT
+	context.scene_manager->ActivateScene(0);
+
 	// Create renderer based on active define.
 	std::unique_ptr<Renderer> renderer = nullptr;
 	#if defined(SOFTWARE_PATH_TRACER)
