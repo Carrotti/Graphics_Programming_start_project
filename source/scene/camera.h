@@ -44,12 +44,9 @@ namespace gfx
 		Camera& operator=(Camera&&) = default;
 
 		//--- Functions ---
-		void MoveForward(const float delta)
-		{ position_ += forward_ * delta; dirty_ = true; }
-		void MoveRight(const float delta)
-		{ position_ += right_ * delta; dirty_ = true; }
-		void MoveUp(const float delta)
-		{ position_ += Vector4::UnitY() * delta; dirty_ = true; }
+		void MoveForward(const float delta) { position_ += forward_ * delta; dirty_ = true; }
+		void MoveRight(const float delta) { position_ += right_ * delta; dirty_ = true; }
+		void MoveUp(const float delta) { position_ += Vector4::UnitY() * delta; dirty_ = true; }
 
 		void Pitch(const float angle)
 		{
@@ -66,7 +63,7 @@ namespace gfx
 			dirty_ = true;
 		}
 
-		void SetPosition(const Vector3& position) { position_ = Vector4(position, 1.f); dirty_ = true; }
+		void SetPosition(const Vector3& position) { position_ = Vector4(position, 1.f);  dirty_ = true; }
 		void SetFovAngle(const float fov_angle) { fov_angle_ = fov_angle; dirty_ = true; }
 
 		bool IsDirty() const { return dirty_; }
@@ -78,10 +75,8 @@ namespace gfx
 
 		const Matrix& GetView()
 		{
-			view_ = Matrix::CreateLookAtLH(position_, forward_, up_);
+			UpdateView();
 			return view_;
-
-			//(void)fov_angle_;
 		}
 		const Matrix& GetProjection(const float fov_y, const float aspect_ratio)
 		{
@@ -89,6 +84,14 @@ namespace gfx
 			(void)fov_y; (void)aspect_ratio;
 			(void)near_plane_; (void)far_plane_;
 			return projection_;
+		}
+	private:
+		void UpdateView()
+		{
+			forward_.Normalize();
+			right_ = Vector4::Cross(Vector4::UnitY(), forward_).Normalized();
+			up_ = Vector4::Cross(forward_, right_).Normalized();
+			view_ = Matrix::CreateLookAtLH(position_, forward_, up_);
 		}
 	};
 }

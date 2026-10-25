@@ -78,7 +78,6 @@ namespace gfx
 		bool SceneClosestHitTest(const Ray& ray,
 			RayHitRecord& closest_hit, bool ignore_record = false) const
 		{
-			(void)ignore_record;
 			bool did_hit{ false };
 			for (int object_index{ 0 }; object_index < objects.size(); object_index++)
 			{
@@ -91,20 +90,21 @@ namespace gfx
 				{
 				case PrimitiveType::kSphere:
 				{
-					Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
-					if (!HitTestSphere(*sphere, ray, candidate_closest_hit)) continue;
+					const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
+					if (!HitTestSphere(*sphere, ray, candidate_closest_hit, ignore_record)) continue;
 					break;
 				}
 				case PrimitiveType::kPlane:
 				{
 					Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
-					if (!HitTestPlane(*plane, ray, candidate_closest_hit)) continue;
+					if (!HitTestPlane(*plane, ray, candidate_closest_hit, ignore_record)) continue;
 					break;
 				}
 				default:
 					//unhandled case
 					continue;
 				}
+				if (ignore_record) return true;
 				did_hit = true;
 				if (candidate_closest_hit.t < closest_hit.t)
 				{
@@ -122,7 +122,7 @@ namespace gfx
 
 
 			const Ray& ray{ hit.ray };
-			shading_input.view_direction = ray.direction.Normalized();//IDK
+			shading_input.view_direction = -ray.direction;
 			shading_input.world_position = ray.origin + ray.direction * hit.t;
 
 			const Primitive* prim{ primitives_factory.Get(hit.object_index) };

@@ -41,6 +41,7 @@ namespace gfx
 		float Normalize();
 
 		static float Dot(const Vector4& v1, const Vector4& v2);
+		static Vector4 Cross(const Vector4& v1, const Vector4& v2);
 
 		//--- Operators ---
 		Vector4 operator*(const float scale) const;
