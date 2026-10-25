@@ -33,6 +33,8 @@ void SoftwarePathTracer::Render()
 	const float alpha{ active_scene->camera.GetFovAngle() * std::numbers::pi_v<float> / 180.f };
 	const float FOV{ tanf(alpha / 2.f) };
 
+	const Matrix& camera_view{ active_scene->camera.GetView() };
+
 	for (uint32_t py{ 0 }; py < surface_info.height; ++py)
 	{
 		for (uint32_t px{ 0 }; px < surface_info.width; ++px)
@@ -50,11 +52,8 @@ void SoftwarePathTracer::Render()
 			//calculate ray using NDC
 			float x_ndc{ ((2.f * (px + 0.5f) / surface_info.width) - 1.f) * aspect_ratio * FOV };
 			float y_ndc{ (1.f - (2.f * (py + 0.5f) / surface_info.height)) * FOV };
-			const Matrix& camera_view{ active_scene->camera.GetView() };
 			Vector3 ray_direction{ x_ndc, y_ndc, 1 };
 			Ray world_ray{ .direction = ray_direction.Normalized() };
-
-
 			Ray view_ray{ camera_view.TransformRay(world_ray) };
 
 

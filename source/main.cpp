@@ -10,9 +10,9 @@
 
 //--- Defines ---
 #if defined(HARDWARE_RASTERIZER)
-	#define USE_CPU_SURFACE 0
+#define USE_CPU_SURFACE 0
 #else
-	#define USE_CPU_SURFACE 1
+#define USE_CPU_SURFACE 1
 #endif
 
 //--- Standard Includes ---
@@ -27,21 +27,21 @@
 #include <scenes.h>
 #include <renderer.h>
 #if defined(SOFTWARE_PATH_TRACER)
-	#include <software_path_tracer.h>
+#include <software_path_tracer.h>
 #elif defined(SOFTWARE_RASTERIZER)
-	#include <software_rasterizer.h>
+#include <software_rasterizer.h>
 #elif defined(HARDWARE_RASTERIZER)
-	#include <glad/gl.h>
-	#include <hardware_rasterizer.h>
+#include <glad/gl.h>
+#include <hardware_rasterizer.h>
 #endif
 using namespace gfx;
 
 //--- Frame Limiter ---
 #if defined(HARDWARE_RASTERIZER)
 	// GPU handles frame pacing (vsync)
-	#define CPU_FRAME_LIMITER_ENABLED 0
+#define CPU_FRAME_LIMITER_ENABLED 0
 #else
-	#define CPU_FRAME_LIMITER_ENABLED 1
+#define CPU_FRAME_LIMITER_ENABLED 1
 #endif
 class FrameLimiter final
 {
@@ -72,7 +72,7 @@ namespace
 	void SaveScreenshot([[maybe_unused]] SDL_Surface* surface,
 		[[maybe_unused]] SDL_Window* window, const Logger& logger)
 	{
-	#if USE_CPU_SURFACE == 1
+#if USE_CPU_SURFACE == 1
 		if (!surface)
 		{
 			logger.LogError("[Screenshot] No surface available.");
@@ -82,11 +82,11 @@ namespace
 		const auto now{ std::chrono::system_clock::now() };
 		const auto time{ std::chrono::system_clock::to_time_t(now) };
 		std::tm tm_buf{};
-	#ifdef _WIN32
+#ifdef _WIN32
 		localtime_s(&tm_buf, &time);
-	#else
+#else
 		localtime_r(&time, &tm_buf);
-	#endif
+#endif
 
 		std::ostringstream filename;
 		filename << "screenshots/screenshot_"
@@ -98,7 +98,7 @@ namespace
 			logger.LogInfo("[Screenshot] Saved: {}", filename.str());
 		else
 			logger.LogError("[Screenshot] Failed: {}", SDL_GetError());
-	#else
+#else
 		// Read back the GPU framebuffer via glReadPixels, create an SDL_Surface, and save.
 		int w = 0, h = 0;
 		SDL_GetWindowSize(window, &w, &h);
@@ -111,11 +111,11 @@ namespace
 		const auto now{ std::chrono::system_clock::now() };
 		const auto time{ std::chrono::system_clock::to_time_t(now) };
 		std::tm tm_buf{};
-	#ifdef _WIN32
+#ifdef _WIN32
 		localtime_s(&tm_buf, &time);
-	#else
+#else
 		localtime_r(&time, &tm_buf);
-	#endif
+#endif
 
 		std::ostringstream filename;
 		filename << "screenshots/screenshot_"
@@ -154,7 +154,7 @@ namespace
 		{
 			logger.LogError("[Screenshot] Failed to create surface: {}", SDL_GetError());
 		}
-	#endif
+#endif
 	}
 
 	void SetSurfaceSize(SDL_Window* window, SurfaceInfo& info)
@@ -186,9 +186,9 @@ int main(int, char**)
 	//LeakDetector::BreakOnAllocationId(id);
 
 	// Create SDL window and acquire surface (if enabled).
-	#ifdef GFX_PLATFORM_LINUX // VM issues with broken Wayland support, force X11 for now.
-		SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11");
-	#endif
+#ifdef GFX_PLATFORM_LINUX // VM issues with broken Wayland support, force X11 for now.
+	SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "x11");
+#endif
 	if (!SDL_Init(SDL_INIT_VIDEO))
 	{
 		context.logger->LogCritical("SDL_Init failed: {}", SDL_GetError());
@@ -208,56 +208,57 @@ int main(int, char**)
 
 	// Get the surface information. This will be either a handle or pixel buffer.
 	SDL_Surface* surface = nullptr;
-	#if USE_CPU_SURFACE == 1
+#if USE_CPU_SURFACE == 1
 	{
 		surface = SDL_GetWindowSurface(window.get());
 		context.surface_info.pixel_format_details = SDL_GetPixelFormatDetails(surface->format);
 		context.surface_info.pixel_buffer = static_cast<uint32_t*>(surface->pixels);
 	}
-	#else
+#else
 	{
 		(void)surface;
 		SDL_PropertiesID props = SDL_GetWindowProperties(window.get());
-	#if defined(GFX_PLATFORM_WINDOWS)
+#if defined(GFX_PLATFORM_WINDOWS)
 		context.surface_info.window_os_handle =
 			SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
-	#elif defined(GFX_PLATFORM_WAYLAND)
+#elif defined(GFX_PLATFORM_WAYLAND)
 		context.surface_info.window_os_handle =
 			SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_SURFACE_POINTER, nullptr);
 		context.surface_info.display_os_handle =
 			SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WAYLAND_DISPLAY_POINTER, nullptr);
-	#elif defined(GFX_PLATFORM_X11)
+#elif defined(GFX_PLATFORM_X11)
 		context.surface_info.window_os_handle =
 			reinterpret_cast<void*>(static_cast<uintptr_t>(
 				SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0)));
 		context.surface_info.display_os_handle =
 			SDL_GetPointerProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, nullptr);
-	#endif
+#endif
 		// Set initial dimensions for the GPU renderer.
 		context.surface_info.width = width;
 		context.surface_info.height = height;
 	}
-	#endif
+#endif
 
 	// Create scenes based on active renderer.
-	#if defined(SOFTWARE_PATH_TRACER)
-		context.scene_manager->CreateScene<BasicScene>();
-	#elif defined(SOFTWARE_RASTERIZER)
-	#elif defined(HARDWARE_RASTERIZER)
-	#endif
+#if defined(SOFTWARE_PATH_TRACER)
+	context.scene_manager->CreateScene<InstanceScene>();
+	context.scene_manager->CreateScene<BasicScene>();
+#elif defined(SOFTWARE_RASTERIZER)
+#elif defined(HARDWARE_RASTERIZER)
+#endif
 
-	//MY EDIT
+//MY EDIT
 	context.scene_manager->ActivateScene(0);
 
 	// Create renderer based on active define.
 	std::unique_ptr<Renderer> renderer = nullptr;
-	#if defined(SOFTWARE_PATH_TRACER)
-		renderer = std::make_unique<SoftwarePathTracer>(&context);
-	#elif defined(SOFTWARE_RASTERIZER)
-		renderer = std::make_unique<SoftwareRasterizer>(&context);
-	#elif defined(HARDWARE_RASTERIZER)
-		renderer = std::make_unique<HardwareRasterizer>(&context);
-	#endif
+#if defined(SOFTWARE_PATH_TRACER)
+	renderer = std::make_unique<SoftwarePathTracer>(&context);
+#elif defined(SOFTWARE_RASTERIZER)
+	renderer = std::make_unique<SoftwareRasterizer>(&context);
+#elif defined(HARDWARE_RASTERIZER)
+	renderer = std::make_unique<HardwareRasterizer>(&context);
+#endif
 
 	// Register key bindings and add screenshot key binding.
 	std::vector<KeyBinding> key_bindings = RegisterKeyBindings(context);
@@ -265,7 +266,7 @@ int main(int, char**)
 		[&surface, &window, &context]()
 	{
 		SaveScreenshot(surface, window.get(), *context.logger);
-	}});
+	} });
 
 	// Print info.
 	PrintKeyBindings(key_bindings, *context.logger);
@@ -276,9 +277,9 @@ int main(int, char**)
 	while (is_looping)
 	{
 		// Limit the entire frame if enabled.
-		#if CPU_FRAME_LIMITER_ENABLED
-			FrameLimiter limiter(120.0);
-		#endif
+#if CPU_FRAME_LIMITER_ENABLED
+		FrameLimiter limiter(120.0);
+#endif
 
 		// Tick the timer at the start of the frame so all systems use the same delta time.
 		context.timer->Tick();
@@ -335,7 +336,7 @@ int main(int, char**)
 			// Right Mouse Button: Look around (pitch/yaw).
 			if (mouse_state & SDL_BUTTON_RMASK)
 			{
-				active_scene->camera.Pitch(-mouse_y * current_rotation_speed);
+				active_scene->camera.Pitch(mouse_y * current_rotation_speed);
 				active_scene->camera.Yaw(mouse_x * current_rotation_speed);
 
 				// Right Mouse + WASD: Fly around with look.
@@ -385,16 +386,16 @@ int main(int, char**)
 			std::string title = std::format("{} | FPS: {:.0f} | {:.1f}ms", window_title, fps, dt_ms);
 			if (active_scene)
 				title += std::format(" | Prim: {} | Tris: {}", active_scene->GetPrimitiveCount(), active_scene->GetTriangleCount());
-		#if defined(SOFTWARE_PATH_TRACER)
+#if defined(SOFTWARE_PATH_TRACER)
 			title += std::format(" | Samples: {}", context.debug_params.accumulated_samples);
-		#endif
+#endif
 			SDL_SetWindowTitle(window.get(), title.c_str());
 		}
-		#if USE_CPU_SURFACE == 1
+#if USE_CPU_SURFACE == 1
 		{
 			SDL_UpdateWindowSurface(window.get());
 		}
-		#endif
+#endif
 	}
 
 	renderer.reset();

@@ -84,6 +84,11 @@ namespace gfx
 				const SceneObject& object{ objects[object_index] };
 				Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 				if (prim == nullptr) continue;
+				Ray transformed_ray{
+					object.instance_transformation.has_value() ?
+					object.instance_transformation->TransformRay(ray) :
+					ray
+				};
 
 				RayHitRecord candidate_closest_hit{};
 				switch (prim->type)
@@ -91,13 +96,13 @@ namespace gfx
 				case PrimitiveType::kSphere:
 				{
 					const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
-					if (!HitTestSphere(*sphere, ray, candidate_closest_hit, ignore_record)) continue;
+					if (!HitTestSphere(*sphere, transformed_ray, candidate_closest_hit, ignore_record)) continue;
 					break;
 				}
 				case PrimitiveType::kPlane:
 				{
 					Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
-					if (!HitTestPlane(*plane, ray, candidate_closest_hit, ignore_record)) continue;
+					if (!HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record)) continue;
 					break;
 				}
 				default:
@@ -109,7 +114,7 @@ namespace gfx
 				if (candidate_closest_hit.t < closest_hit.t)
 				{
 					closest_hit.t = candidate_closest_hit.t;
-					closest_hit.ray = ray;
+					closest_hit.ray = transformed_ray;
 					closest_hit.object_index = object_index;
 				}
 			}
@@ -119,30 +124,36 @@ namespace gfx
 		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const
 		{
 			ShadingInput shading_input{};
-
-
+			const SceneObject& object{ objects[hit.object_index] };
 			const Ray& ray{ hit.ray };
 			shading_input.view_direction = -ray.direction;
 			shading_input.world_position = ray.origin + ray.direction * hit.t;
+			
 
-			const Primitive* prim{ primitives_factory.Get(hit.object_index) };
+			const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 			switch (prim->type)
 			{
 			case PrimitiveType::kSphere:
 			{
-				Sphere* sphere{ primitives_factory.GetAs<Sphere>(hit.object_index) };
+				Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
 				shading_input.world_normal = (shading_input.world_position - sphere->origin).Normalized();
 				break;
 			}
 			case PrimitiveType::kPlane:
 			{
-				Plane* plane{ primitives_factory.GetAs<Plane>(hit.object_index) };
+				Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
 				shading_input.world_normal = plane->normal;
 				break;
 			}
 			default:
 				//unhandled case
 				break;
+			}
+
+			if (object.instance_transformation.has_value())
+			{
+				shading_input.world_position = object.instance_transformation->TransformPoint(shading_input.world_position);
+				shading_input.world_normal = object.instance_transformation->TransformNormal(shading_input.world_normal);
 			}
 			return shading_input;
 		}
