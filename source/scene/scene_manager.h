@@ -200,7 +200,16 @@ namespace gfx
 			case PrimitiveType::kTriangleMesh:
 			{
 				const TriangleMesh* triangle_mesh{ primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
-				shading_input.world_normal = triangle_mesh->vertices[hit.vertex_indices.value()[0]].normal.value();
+				Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
+				Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
+				Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
+				Vector3 n0{ v0.normal.value() };
+				Vector3 n1{ v1.normal.value() };
+				Vector3 n2{ v2.normal.value() };
+				float u{ hit.barycentric_coordinates.value()[0] };
+				float v{ hit.barycentric_coordinates.value()[1] };
+				float w{ 1 - u - v };
+				shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
 				break;
 			}
 			default:
