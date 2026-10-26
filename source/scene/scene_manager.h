@@ -78,9 +78,12 @@ namespace gfx
 		bool SceneClosestHitTest(const Ray& ray,
 			RayHitRecord& closest_hit, bool ignore_record = false) const
 		{
-			bool did_hit{ false };
+			bool did_hit_anything{ false };
 			for (int object_index{ 0 }; object_index < objects.size(); object_index++)
 			{
+
+				bool did_hit{ false };
+
 				const SceneObject& object{ objects[object_index] };
 				Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 				if (prim == nullptr) continue;
@@ -91,42 +94,76 @@ namespace gfx
 				};
 
 				RayHitRecord candidate_closest_hit{};
+
+				auto save_closest_hit = [&]()
+					{
+						if (did_hit) did_hit_anything = true;
+						if (did_hit && candidate_closest_hit.t < closest_hit.t && !ignore_record)
+						{
+							candidate_closest_hit.object_index = object_index;
+							closest_hit = candidate_closest_hit;
+						}
+					};
+
 				switch (prim->type)
 				{
 				case PrimitiveType::kSphere:
 				{
 					const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
-					if (!HitTestSphere(*sphere, transformed_ray, candidate_closest_hit, ignore_record)) continue;
+					did_hit = HitTestSphere(*sphere, transformed_ray, candidate_closest_hit, ignore_record);
+					save_closest_hit();
 					break;
 				}
 				case PrimitiveType::kPlane:
 				{
 					const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
-					if (!HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record)) continue;
+					did_hit = HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record);
+					save_closest_hit();
 					break;
 				}
 				case PrimitiveType::kTriangle:
 				{
 					const Triangle* triangle{ primitives_factory.GetAs<Triangle>(object.primitive_index) };
-					if (!HitTestTriangle(*triangle, transformed_ray, candidate_closest_hit, ignore_record)) continue;
+					did_hit = HitTestTriangle(*triangle, transformed_ray, candidate_closest_hit, ignore_record);
+					save_closest_hit();
+					break;
+				}
+				case PrimitiveType::kTriangleMesh:
+				{
+					const TriangleMesh* triangle_mesh{ primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
+					for (int triangle_idx{}; triangle_idx < triangle_mesh->indices.size(); triangle_idx += 3)
+					{
+						Triangle triangle{};
+
+						triangle.v0 = triangle_mesh->vertices[triangle_mesh->indices[triangle_idx]].position;
+						triangle.v1 = triangle_mesh->vertices[triangle_mesh->indices[triangle_idx + 1]].position;
+						triangle.v2 = triangle_mesh->vertices[triangle_mesh->indices[triangle_idx + 2]].position; 
+						triangle.normal = Vector3::Cross(
+							triangle.v1 - triangle.v0,
+							triangle.v2 - triangle.v0
+						).Normalized();
+						triangle.cull_mode = triangle_mesh->cull_mode;
+						did_hit = HitTestTriangle(triangle, transformed_ray, candidate_closest_hit, ignore_record);
+						if (did_hit && candidate_closest_hit.t < closest_hit.t && !ignore_record)
+						{
+							candidate_closest_hit.vertex_indices = {
+								triangle_mesh->indices[triangle_idx],
+								triangle_mesh->indices[triangle_idx + 1],
+								triangle_mesh->indices[triangle_idx + 2]
+							};
+						}
+						save_closest_hit();
+					}
 					break;
 				}
 				default:
-					//unhandled case
+					std::cerr << "unhandled case: SceneClosestHitTest\n";
 					continue;
 				}
-				if (ignore_record) return true;
-				did_hit = true;
-				if (candidate_closest_hit.t < closest_hit.t)
-				{
-					closest_hit.t = candidate_closest_hit.t;
-					closest_hit.ray = transformed_ray;
-					closest_hit.object_index = object_index;
-					closest_hit.barycentric_coordinates = candidate_closest_hit.barycentric_coordinates;
-					closest_hit.vertex_indices = candidate_closest_hit.vertex_indices;
-				}
+
+
 			}
-			return did_hit;
+			return did_hit_anything;
 		}
 
 		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const
@@ -136,7 +173,7 @@ namespace gfx
 			const Ray& ray{ hit.ray };
 			shading_input.view_direction = -ray.direction;
 			shading_input.world_position = ray.origin + ray.direction * hit.t;
-			
+
 
 			const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 			switch (prim->type)
@@ -158,6 +195,12 @@ namespace gfx
 				const Triangle* triangle{ primitives_factory.GetAs<Triangle>(object.primitive_index) };
 				shading_input.world_normal = triangle->normal;
 				//TODO
+				break;
+			}
+			case PrimitiveType::kTriangleMesh:
+			{
+				const TriangleMesh* triangle_mesh{ primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
+				shading_input.world_normal = triangle_mesh->vertices[hit.vertex_indices.value()[0]].normal.value();
 				break;
 			}
 			default:
