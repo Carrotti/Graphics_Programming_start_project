@@ -116,11 +116,4 @@ void SoftwarePathTracer::Render()
 	std::for_each(std::execution::par, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
 #endif
 
-	for (uint32_t py{ 0 }; py < surface_info.height; ++py)
-	{
-		for (uint32_t px{ 0 }; px < surface_info.width; ++px)
-		{
-
-		}
-	}
 }

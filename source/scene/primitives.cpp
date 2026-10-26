@@ -4,22 +4,39 @@
 //  Copyright (c) 2026 Matthieu Delaere. All rights reserved.
 //==============================================================
 #include <primitives.h>
+#include <vector3.h>
 using namespace gfx;
 
 //--- Primitives AABB Updates ---
 void Sphere::UpdateAABB()
 {
-	//TODO
+	if (!bounding_box.has_value()) bounding_box.emplace();
+	const Vector3 box_half_extent{ radius,radius,radius };
+	bounding_box.value().ExpandToInclude(origin + box_half_extent);
+	bounding_box.value().ExpandToInclude(origin - box_half_extent);
 }
+/*
+void Plane::UpdateAABB()
+{
+
+}
+*/
 
 void Triangle::UpdateAABB()
 {
-	//TODO
+	if (!bounding_box.has_value()) bounding_box.emplace();
+	bounding_box.value().ExpandToInclude(v0);
+	bounding_box.value().ExpandToInclude(v1);
+	bounding_box.value().ExpandToInclude(v2);
 }
 
 void TriangleMesh::UpdateAABB()
 {
-	//TODO
+	if (!bounding_box.has_value()) bounding_box.emplace();
+	for (const Vertex& vertex : vertices)
+	{
+		bounding_box.value().ExpandToInclude(vertex.position);
+	}
 }
 
 //--- AABB ---

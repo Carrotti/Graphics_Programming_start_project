@@ -85,9 +85,9 @@ namespace gfx
 				bool did_hit{ false };
 
 				const SceneObject& object{ objects[object_index] };
-				Primitive* prim{ primitives_factory.Get(object.primitive_index) };
+				const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 				if (prim == nullptr) continue;
-				Ray transformed_ray{
+				const Ray& transformed_ray{
 					object.instance_transformation.has_value() ?
 					object.instance_transformation->TransformRay(ray) :
 					ray
@@ -110,13 +110,21 @@ namespace gfx
 				case PrimitiveType::kSphere:
 				{
 					const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
+					if (sphere->bounding_box.has_value())
+					{
+						if (!HitTestAABB(sphere->bounding_box.value(), transformed_ray)) break;
+					}
 					did_hit = HitTestSphere(*sphere, transformed_ray, candidate_closest_hit, ignore_record);
 					save_closest_hit();
 					break;
 				}
 				case PrimitiveType::kPlane:
 				{
-					const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
+					const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) }; 
+					if (plane->bounding_box.has_value())
+					{
+						if (!HitTestAABB(plane->bounding_box.value(), transformed_ray)) break;
+					}
 					did_hit = HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record);
 					save_closest_hit();
 					break;
@@ -124,6 +132,10 @@ namespace gfx
 				case PrimitiveType::kTriangle:
 				{
 					const Triangle* triangle{ primitives_factory.GetAs<Triangle>(object.primitive_index) };
+					if (triangle->bounding_box.has_value())
+					{
+						if (!HitTestAABB(triangle->bounding_box.value(), transformed_ray)) break;
+					}
 					did_hit = HitTestTriangle(*triangle, transformed_ray, candidate_closest_hit, ignore_record);
 					save_closest_hit();
 					break;
@@ -131,6 +143,10 @@ namespace gfx
 				case PrimitiveType::kTriangleMesh:
 				{
 					const TriangleMesh* triangle_mesh{ primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
+					if (triangle_mesh->bounding_box.has_value())
+					{
+						if (!HitTestAABB(triangle_mesh->bounding_box.value(), transformed_ray)) break;
+					}
 					for (int triangle_idx{}; triangle_idx < triangle_mesh->indices.size(); triangle_idx += 3)
 					{
 						Triangle triangle{};
@@ -160,8 +176,6 @@ namespace gfx
 					std::cerr << "unhandled case: SceneClosestHitTest\n";
 					continue;
 				}
-
-
 			}
 			return did_hit_anything;
 		}

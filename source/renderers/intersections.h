@@ -8,6 +8,7 @@
 
 //--- Standard Includes ---
 #include <cassert>
+#include <algorithm>
 
 //--- Framework Includes ---
 #include <primitives.h>
@@ -106,7 +107,7 @@ namespace gfx
 		if (u < 0 || u > 1) return false;
 
 		const Vector3 q{ Vector3::Cross(s, e1) };
-		const float v{ Vector3::Dot(ray.direction, q) * inv_det};
+		const float v{ Vector3::Dot(ray.direction, q) * inv_det };
 		if (v < 0 || (u + v) > 1) return false;
 
 		const float t{ Vector3::Dot(e2,q) * inv_det };
@@ -122,7 +123,7 @@ namespace gfx
 
 
 		//first method
-/*		
+/*
 		const float t{ Vector3::Dot(triangle.v0 - ray.origin, triangle.normal) / n_dot_v };
 
 		if (t < ray.min || t > ray.max) return false;
@@ -154,10 +155,33 @@ namespace gfx
 	[[maybe_unused]]
 	static bool HitTestAABB(const AABB& aabb, const Ray& ray)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)aabb; (void)ray;
-		return false;
+		float tmin{ ray.min };
+		float tmax{ ray.max };
+
+		const auto update_axis = [&](const float origin,
+			const float direction,
+			const float min_bound,
+			const float max_bound) 
+			{
+				if (direction == 0.f)
+					return origin >= min_bound && origin <= max_bound;
+
+				float t0{ (min_bound - origin) / direction };
+				float t1{ (max_bound - origin) / direction };
+
+				if (t0 > t1)
+					std::swap(t0, t1);
+
+				tmin = std::max(tmin, t0);
+				tmax = std::min(tmax, t1);
+
+				return tmin <= tmax;
+			};
+
+		return update_axis(ray.origin.x, ray.direction.x, aabb.min.x, aabb.max.x)
+			&& update_axis(ray.origin.y, ray.direction.y, aabb.min.y, aabb.max.y)
+			&& update_axis(ray.origin.z, ray.direction.z, aabb.min.z, aabb.max.z);
+
 	}
 }
 #endif //INTERSECTIONS_HEADER
