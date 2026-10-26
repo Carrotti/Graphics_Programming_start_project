@@ -101,8 +101,14 @@ namespace gfx
 				}
 				case PrimitiveType::kPlane:
 				{
-					Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
+					const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
 					if (!HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record)) continue;
+					break;
+				}
+				case PrimitiveType::kTriangle:
+				{
+					const Triangle* triangle{ primitives_factory.GetAs<Triangle>(object.primitive_index) };
+					if (!HitTestTriangle(*triangle, transformed_ray, candidate_closest_hit, ignore_record)) continue;
 					break;
 				}
 				default:
@@ -116,6 +122,8 @@ namespace gfx
 					closest_hit.t = candidate_closest_hit.t;
 					closest_hit.ray = transformed_ray;
 					closest_hit.object_index = object_index;
+					closest_hit.barycentric_coordinates = candidate_closest_hit.barycentric_coordinates;
+					closest_hit.vertex_indices = candidate_closest_hit.vertex_indices;
 				}
 			}
 			return did_hit;
@@ -135,14 +143,21 @@ namespace gfx
 			{
 			case PrimitiveType::kSphere:
 			{
-				Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
+				const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
 				shading_input.world_normal = (shading_input.world_position - sphere->origin).Normalized();
 				break;
 			}
 			case PrimitiveType::kPlane:
 			{
-				Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
+				const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
 				shading_input.world_normal = plane->normal;
+				break;
+			}
+			case PrimitiveType::kTriangle:
+			{
+				const Triangle* triangle{ primitives_factory.GetAs<Triangle>(object.primitive_index) };
+				shading_input.world_normal = triangle->normal;
+				//TODO
 				break;
 			}
 			default:

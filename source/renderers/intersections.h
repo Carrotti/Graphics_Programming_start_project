@@ -85,10 +85,70 @@ namespace gfx
 	static bool HitTestTriangle(const Triangle& triangle, const Ray& ray,
 		RayHitRecord& hit_record, const bool ignore_hit_record = false)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)triangle; (void)ray; (void)hit_record; (void)ignore_hit_record;
-		return false;
+		const float n_dot_v{ Vector3::Dot(triangle.normal, ray.direction) };
+
+		if (std::abs(n_dot_v) < std::numeric_limits<float>::epsilon()) return false; //parallel
+		if (triangle.cull_mode == CullMode::kBackFaceCulling && n_dot_v > 0) return false;
+		if (triangle.cull_mode == CullMode::kFrontFaceCulling && n_dot_v < 0) return false;
+
+
+		//möller trumbone
+		const Vector3 e1{ triangle.v1 - triangle.v0 };
+		const Vector3 e2{ triangle.v2 - triangle.v0 };
+
+		const Vector3 h{ Vector3::Cross(ray.direction , e2) };
+		const float det{ Vector3::Dot(h, e1) };
+		if (std::abs(det) < std::numeric_limits<float>::epsilon()) return false;
+		const float inv_det{ 1.f / det };
+		const Vector3 s{ ray.origin - triangle.v0 };
+
+		const float u{ Vector3::Dot(s, h) * inv_det };
+		if (u < 0 || u > 1) return false;
+
+		const Vector3 q{ Vector3::Cross(s, e1) };
+		const float v{ Vector3::Dot(ray.direction, q) * inv_det};
+		if (v < 0 || (u + v) > 1) return false;
+
+		const float t{ Vector3::Dot(e2,q) * inv_det };
+		if (t < ray.min || t > ray.max) return false;
+
+		if (!ignore_hit_record)
+		{
+			hit_record.t = t;
+			hit_record.ray = ray;
+			hit_record.barycentric_coordinates = { u,v };
+		}
+		return true;
+
+
+		//first method
+/*		
+		const float t{ Vector3::Dot(triangle.v0 - ray.origin, triangle.normal) / n_dot_v };
+
+		if (t < ray.min || t > ray.max) return false;
+		const Vector3 p{ ray.origin + ray.direction * t };
+
+		const std::array<const Vector3*, 3> vertices{ &triangle.v0, &triangle.v1, &triangle.v2 };
+		std::array<float, 3> signed_areas_triangle{};
+		for (size_t idx{ 0 }; idx < vertices.size(); ++idx)
+		{
+			const int next_idx{ static_cast<int>((idx + 1) % vertices.size()) };
+			const Vector3 e{ *vertices[next_idx] - *vertices[idx] };
+			const Vector3 vp{ p - *vertices[idx] };
+			const Vector3 e_cross_p{ Vector3::Cross(e, vp) };
+			if (Vector3::Dot(e_cross_p, triangle.normal) < 0) return false;
+			if (!ignore_hit_record) signed_areas_triangle[static_cast<int>((idx + 2) % vertices.size())] = (e_cross_p.Magnitude() / 2);
+		}
+
+		if (!ignore_hit_record)
+		{
+			hit_record.ray = ray;
+			hit_record.t = t;
+			//for barycentric coords, storing u (belong to v1), and v (belong to v2)
+			const float area{ Vector3::Cross(triangle.v0, triangle.v1).Magnitude() / 2 };
+			hit_record.barycentric_coordinates = Vector2{ signed_areas_triangle[1] / area, signed_areas_triangle[2] / area };
+		}
+		return true*/
 	}
 
 	[[maybe_unused]]
