@@ -111,14 +111,14 @@ void SoftwarePathTracer::Render()
 				Vector3 light_dir{
 					light->type == LightType::kDirectional ?
 					-light->direction :
-					(light->origin - shading_input.world_position)
+					(light->origin - shading_input.shadow_origin)
 				};
 				const float light_dist{ light_dir.Normalize() };
 				const float cos_theta{ Vector3::Dot(shading_input.world_normal, light_dir) };
 				if (cos_theta < 0.f) continue;
 
 				Ray shadow_ray{
-					shading_input.world_position,
+					shading_input.shadow_origin,
 					light_dir,
 					1e-3f,
 					light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
@@ -157,8 +157,6 @@ void SoftwarePathTracer::Render()
 
 ColorRgba gfx::SoftwarePathTracer::CalculateRadiance(const Light* light, const Vector3& world_position)
 {
-
-
 	switch (light->type)
 	{
 	case LightType::kPoint:

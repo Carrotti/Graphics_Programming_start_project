@@ -208,7 +208,7 @@ namespace gfx
 			const Ray& ray{ hit.ray };
 			shading_input.view_direction = -ray.direction;
 			shading_input.world_position = ray.origin + ray.direction * hit.t;
-
+			
 
 			const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 			switch (prim->type)
@@ -217,34 +217,48 @@ namespace gfx
 			{
 				const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
 				shading_input.world_normal = (shading_input.world_position - sphere->origin).Normalized();
+				shading_input.shadow_origin = shading_input.world_position;
 				break;
 			}
 			case PrimitiveType::kPlane:
 			{
 				const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
 				shading_input.world_normal = plane->normal;
+				shading_input.shadow_origin = shading_input.world_position;
 				break;
 			}
 			case PrimitiveType::kTriangle:
 			{
 				const Triangle* triangle{ primitives_factory.GetAs<Triangle>(object.primitive_index) };
 				shading_input.world_normal = triangle->normal;
-				//TODO
+				shading_input.shadow_origin = shading_input.world_position;
 				break;
 			}
 			case PrimitiveType::kTriangleMesh:
 			{
 				const TriangleMesh* triangle_mesh{ primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
-				Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
-				Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
-				Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
-				Vector3 n0{ v0.normal.value() };
-				Vector3 n1{ v1.normal.value() };
-				Vector3 n2{ v2.normal.value() };
-				float u{ hit.barycentric_coordinates.value()[0] };
-				float v{ hit.barycentric_coordinates.value()[1] };
-				float w{ 1 - u - v };
+				const Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
+				const Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
+				const Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
+				const Vector3 n0{ v0.normal.value() };
+				const Vector3 n1{ v1.normal.value() };
+				const Vector3 n2{ v2.normal.value() };
+				const float u{ hit.barycentric_coordinates.value()[0] };
+				const float v{ hit.barycentric_coordinates.value()[1] };
+				const float w{ 1 - u - v };
 				shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
+
+				Vector3 tmpu{ shading_input.world_position - v0.position };
+				Vector3 tmpv{ shading_input.world_position - v1.position };
+				Vector3 tmpw{ shading_input.world_position - v2.position };
+				const float dotu{ std::min(0.f, Vector3::Dot(tmpu, n0)) };
+				const float dotv{ std::min(0.f, Vector3::Dot(tmpv, n1)) };
+				const float dotw{ std::min(0.f, Vector3::Dot(tmpw, n2)) };
+				tmpu -= dotu * n0;
+				tmpv -= dotv * n1;
+				tmpw -= dotw * n2;
+				const Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
+				shading_input.shadow_origin = shading_input.world_position + w * tmpu + u * tmpv + v * tmpw + face_normal * 0.001f;
 				break;
 			}
 			default:
@@ -254,8 +268,11 @@ namespace gfx
 
 			if (object.instance_transformation.has_value())
 			{
-				shading_input.world_position = object.instance_transformation->TransformPoint(shading_input.world_position);
-				shading_input.world_normal = object.instance_transformation->TransformNormal(shading_input.world_normal);
+				const Matrix& object_transform{ object.instance_transformation.value() };
+				shading_input.world_position = object_transform.TransformPoint(shading_input.world_position);
+				shading_input.world_normal = object_transform.TransformNormal(shading_input.world_normal);
+				shading_input.shadow_origin = object_transform.TransformPoint(shading_input.shadow_origin);
+				shading_input.view_direction = object_transform.TransformVector(shading_input.view_direction).Normalized();
 			}
 			return shading_input;
 		}
