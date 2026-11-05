@@ -113,11 +113,19 @@ void SoftwarePathTracer::Render()
 					-light->direction :
 					(light->origin - shading_input.world_position)
 				};
-				const float dist{ light_dir.Normalize() };
-				(void)dist;
-				//const float light_distance{ light_dir.Normalize() };
+				const float light_dist{ light_dir.Normalize() };
 				const float cos_theta{ Vector3::Dot(shading_input.world_normal, light_dir) };
 				if (cos_theta < 0.f) continue;
+
+				Ray shadow_ray{
+					shading_input.world_position,
+					light_dir,
+					1e-3f,
+					light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
+				};
+				RayHitRecord hit_record{};
+				if (active_scene->SceneClosestHitTest(shadow_ray, hit_record, true)) continue;
+
 
 				ColorRgba radiance = CalculateRadiance(light, shading_input.world_position);
 				final_color += radiance * cos_theta;
@@ -155,25 +163,10 @@ ColorRgba gfx::SoftwarePathTracer::CalculateRadiance(const Light* light, const V
 	{
 	case LightType::kPoint:
 	{
-		Vector3 shadow_ray_dir{ light->origin - world_position };
-		shadow_ray_dir.Normalize();
-		const Ray shadow_ray{ world_position, shadow_ray_dir , 1e-4f, shadow_ray_dir.Magnitude() };
-		RayHitRecord hit_record{};
-		if (context_->scene_manager->GetActiveScene()->SceneClosestHitTest(shadow_ray, hit_record, true))
-			return ColorRgba{};
-
 		return light->color * light->intensity / (light->origin - world_position).SqrMagnitude();
 	}
 	case LightType::kDirectional:
 	{
-
-		Vector3 shadow_ray_dir{ -light->direction };
-		shadow_ray_dir.Normalize();
-		const Ray shadow_ray{ world_position, shadow_ray_dir , 1e-4f };
-		RayHitRecord hit_record{};
-		if (context_->scene_manager->GetActiveScene()->SceneClosestHitTest(shadow_ray, hit_record, true))
-			return ColorRgba{};
-
 		return light->color * light->intensity;
 	}
 	default:
