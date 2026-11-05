@@ -14,6 +14,7 @@
 #include <texture.h>
 #include <factory.h>
 #include <intersections.h>
+#include <stack>
 
 namespace gfx
 {
@@ -120,7 +121,7 @@ namespace gfx
 				}
 				case PrimitiveType::kPlane:
 				{
-					const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) }; 
+					const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
 					if (plane->bounding_box.has_value())
 					{
 						if (!HitTestAABB(plane->bounding_box.value(), transformed_ray)) break;
@@ -147,28 +148,48 @@ namespace gfx
 					{
 						if (!HitTestAABB(triangle_mesh->bounding_box.value(), transformed_ray)) break;
 					}
-					for (int triangle_idx{}; triangle_idx < triangle_mesh->indices.size(); triangle_idx += 3)
+					if (triangle_mesh->bvh_nodes.empty()) break;
+					std::stack<uint32_t> idx_stack{};
+					idx_stack.push(0);
+					while (!idx_stack.empty())
 					{
-						Triangle triangle{};
-
-						triangle.v0 = triangle_mesh->vertices[triangle_mesh->indices[triangle_idx]].position;
-						triangle.v1 = triangle_mesh->vertices[triangle_mesh->indices[triangle_idx + 1]].position;
-						triangle.v2 = triangle_mesh->vertices[triangle_mesh->indices[triangle_idx + 2]].position; 
-						triangle.normal = Vector3::Cross(
-							triangle.v1 - triangle.v0,
-							triangle.v2 - triangle.v0
-						).Normalized();
-						triangle.cull_mode = triangle_mesh->cull_mode;
-						did_hit = HitTestTriangle(triangle, transformed_ray, candidate_closest_hit, ignore_record);
-						if (did_hit && candidate_closest_hit.t < closest_hit.t && !ignore_record)
+						const uint32_t node_idx{ idx_stack.top() };
+						idx_stack.pop();
+						const BVHNode& node{ triangle_mesh->bvh_nodes[node_idx] };
+						if (!HitTestAABB(node.bounds, transformed_ray)) continue;
+						if (node.IsLeaf())
 						{
-							candidate_closest_hit.vertex_indices = {
-								triangle_mesh->indices[triangle_idx],
-								triangle_mesh->indices[triangle_idx + 1],
-								triangle_mesh->indices[triangle_idx + 2]
-							};
+							//test triangles
+							for (uint32_t bvh_idx{ node.first_tri }; bvh_idx < node.first_tri + node.tri_count; ++bvh_idx)
+							{
+								uint32_t tri_idx{ triangle_mesh->bvh_tri_indices[bvh_idx] };
+								Triangle triangle{};
+
+								triangle.v0 = triangle_mesh->vertices[triangle_mesh->indices[3 * tri_idx]].position;
+								triangle.v1 = triangle_mesh->vertices[triangle_mesh->indices[3 * tri_idx + 1]].position;
+								triangle.v2 = triangle_mesh->vertices[triangle_mesh->indices[3 * tri_idx + 2]].position;
+								triangle.normal = Vector3::Cross(
+									triangle.v1 - triangle.v0,
+									triangle.v2 - triangle.v0
+								).Normalized();
+								triangle.cull_mode = triangle_mesh->cull_mode;
+								did_hit = HitTestTriangle(triangle, transformed_ray, candidate_closest_hit, ignore_record);
+								if (did_hit && candidate_closest_hit.t < closest_hit.t && !ignore_record)
+								{
+									candidate_closest_hit.vertex_indices = {
+										triangle_mesh->indices[3*tri_idx],
+										triangle_mesh->indices[3*tri_idx + 1],
+										triangle_mesh->indices[3*tri_idx + 2]
+									};
+								}
+								save_closest_hit();
+							}
 						}
-						save_closest_hit();
+						else
+						{
+							idx_stack.push(node.left_child);
+							idx_stack.push(node.left_child + 1);
+						}
 					}
 					break;
 				}

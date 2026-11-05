@@ -13,11 +13,14 @@
 #include <vector>
 #include <array>
 #include <memory>
+#include <cstdint>
+#include <utility>
 
 //--- Framework Includes ---
 #include <vector2.h>
 #include <vector3.h>
 #include <color.h>
+#include <vector4.h>
 
 namespace gfx
 {
@@ -321,6 +324,7 @@ namespace gfx
 		}
 
 		void UpdateAABB() override;
+		void CreateBVHNode(uint32_t node_idx, uint32_t first_tri, uint32_t tri_count, const std::vector<AABB>& AABB_array, const std::vector<Vector3>& centroid_array);
 	};
 }
 
