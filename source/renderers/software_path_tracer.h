@@ -28,6 +28,7 @@ namespace gfx
 
 		//--- Public Functions ---
 		void Render() override;
+		ColorRgba CalculateRadiance(const Light* light, const Vector3& world_position);
 	};
 }
 #endif //SOFTWARE_PATH_TRACER_HEADER
