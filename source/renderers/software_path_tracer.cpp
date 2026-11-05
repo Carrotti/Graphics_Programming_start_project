@@ -71,13 +71,6 @@ void SoftwarePathTracer::Render()
 			shading_input = active_scene->ConstructShadingInput(closest_hit_record);
 			switch (context_->debug_params.visualization_mode)
 			{
-			case VisualizationMode::kDepth:
-			{
-				const float max_depth{ 100.f };
-				const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
-				final_color = { scaled_t, scaled_t, scaled_t };
-				break;
-			}
 			case VisualizationMode::kNone:
 			{
 				const uint32_t idx{ closest_hit_record.object_index };
@@ -94,6 +87,21 @@ void SoftwarePathTracer::Render()
 					(n.y + 1.f) * 0.5f,
 					(n.z + 1.f) * 0.5f
 				};
+				break;
+			}
+			case VisualizationMode::kAlbedo:
+			{
+				break;
+			}
+			case VisualizationMode::kDepth:
+			{
+				const float max_depth{ 100.f };
+				const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
+				final_color = { scaled_t, scaled_t, scaled_t };
+				break;
+			}
+			case VisualizationMode::kDirectOnly:
+			{
 				break;
 			}
 			}
@@ -118,10 +126,9 @@ void SoftwarePathTracer::Render()
 
 
 
-		//final_color.MaxToOne();
-
-		final_color.Clamp();
+		final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
 		final_color = final_color.ToSrgb();
+		final_color.Clamp();
 
 		// Write to surface
 		surface_info.pixel_buffer[px + (py * surface_info.width)] = SDL_MapRGB(
