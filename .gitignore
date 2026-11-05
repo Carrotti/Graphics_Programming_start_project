@@ -392,3 +392,4 @@ build/msvc/.ninja_deps
 build/msvc/.ninja_log
 build/msvc/CMakeFiles/CMakeConfigureLog.yaml
 build/msvc/CMakeFiles/common.ninja
+/.vscode

@@ -9,6 +9,7 @@
 //--- Standard includes ---
 #include <vector>
 #include <memory>
+#include <cstdint>
 
 //--- External includes ---
 // The spdlog library does not use the latest fmt library, which triggers
@@ -21,6 +22,8 @@
 	#pragma GCC diagnostic ignored "-Wshadow"
 #endif
 #include <spdlog/spdlog.h>
+#include <spdlog/logger.h>
+#include <spdlog/common.h>
 #ifdef _MSC_VER
 	#pragma warning(pop)
 #elif defined(__GNUC__) || defined(__clang__)

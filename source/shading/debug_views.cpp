@@ -4,7 +4,9 @@
 //  Copyright (c) 2026 Matthieu Delaere. All rights reserved.
 //==============================================================
 #include <context.h>
-#include <scenes.h>
+#include <vector>
+#include "debug_views.h"
+#include <color.h>
 
 namespace gfx
 {

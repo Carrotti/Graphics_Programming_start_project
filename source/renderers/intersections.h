@@ -9,10 +9,15 @@
 //--- Standard Includes ---
 #include <cassert>
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
+#include <utility>
 
 //--- Framework Includes ---
 #include <primitives.h>
-#include <matrix.h>
+#include <vector3.h>
+#include <vector2.h>
 
 namespace gfx
 {
@@ -28,7 +33,7 @@ namespace gfx
 		const float od2{ Vector3::Dot(L,L) - t_ca * t_ca };
 		if (od2 > sphere.radius * sphere.radius)
 			return false;
-		const float t_hc{ sqrt(sphere.radius * sphere.radius - od2) };
+		const float t_hc{ std::sqrt(sphere.radius * sphere.radius - od2) };
 		const float t{ t_ca - t_hc };
 		const Vector3 p{ ray.origin + t * ray.direction }; //p is intersection point
 
