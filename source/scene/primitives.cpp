@@ -113,28 +113,18 @@ void TriangleMesh::CreateBVHNode(
 		else
 			axis = 2;
 
-		//get midpoint
-		float midpoint{};
-		for (uint32_t bvh_idx{ first_tri }; bvh_idx < first_tri + tri_count; ++bvh_idx)
-		{
-			uint32_t tri_idx{ bvh_tri_indices[bvh_idx] };
-			midpoint += centroid_array[tri_idx][axis];
-		}
-		midpoint /= tri_count;
+		uint32_t left_count = tri_count / 2;
 
-
-
-		uint32_t left_count{};
-
-		for (uint32_t bvh_idx{ first_tri }; bvh_idx < first_tri + tri_count; ++bvh_idx)
-		{
-			uint32_t tri_idx{ bvh_tri_indices[bvh_idx] };
-			if (centroid_array[tri_idx][axis] < midpoint)
-			{
-				std::swap(bvh_tri_indices[bvh_idx], bvh_tri_indices[first_tri + left_count]);
-				++left_count;
+		// Partition the triangle indices so the first 'left_count' elements are on one side
+		std::nth_element(
+			bvh_tri_indices.begin() + first_tri,
+			bvh_tri_indices.begin() + first_tri + left_count,
+			bvh_tri_indices.begin() + first_tri + tri_count,
+			[axis, &centroid_array](uint32_t a, uint32_t b) {
+				return centroid_array[a][axis] < centroid_array[b][axis];
 			}
-		}
+		);
+
 		bvh_nodes.emplace_back();
 		bvh_nodes.emplace_back();
 
