@@ -65,14 +65,11 @@ void SoftwarePathTracer::Render()
 		ShadingInput shading_input{};
 		ColorRgba final_color{ active_scene->background_color };
 
-		auto calc_direct_fnc = [&](const Light* light, Vector3 light_dir) -> ColorRgba {
+		auto calc_cosine_fnc = [&](const Vector3& normal, const Vector3& light_dir) -> float {
+			return std::max(0.f, Vector3::Dot(normal, light_dir));
+			};
 
-			const float light_dist{ light_dir.Normalize() };
-
-			//angle
-			const float cos_theta{ Vector3::Dot(shading_input.world_normal, light_dir) };
-			if (cos_theta < 0.f) return ColorRgba{};
-
+		auto calc_direct_fnc = [&](const Light* light, const Vector3& light_dir, float light_dist) -> ColorRgba {
 			//shadow
 			Ray shadow_ray{
 				shading_input.shadow_origin,
@@ -85,35 +82,33 @@ void SoftwarePathTracer::Render()
 
 			//radiance
 			ColorRgba radiance = CalculateRadiance(light, shading_input.world_position);
-			return radiance * cos_theta;
+			return radiance;
 			};
 
 		bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
 		if (did_hit)
 		{
 			shading_input = active_scene->ConstructShadingInput(closest_hit_record);
+			const uint32_t obj_idx{ closest_hit_record.object_index };
+			const SceneObject& obj{ active_scene->objects.at(obj_idx) };
+			const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
+			const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
+
 			switch (context_->debug_params.visualization_mode)
 			{
 			case VisualizationMode::kNone:
 			{
-				const uint32_t obj_idx{ closest_hit_record.object_index };
-				const SceneObject& obj{ active_scene->objects.at(obj_idx) };
-				const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
-				const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
-
-
-
 				for (const Light* light : active_scene->lights_factory.GetAll())
 				{
 
-					Vector3 light_dir{
-						light->type == LightType::kDirectional ?
+					Vector3 light_dir{ light->type == LightType::kDirectional ?
 						-light->direction :
-						(light->origin - shading_input.shadow_origin)
-					};
+						(light->origin - shading_input.shadow_origin) };
+					float light_dist{ light_dir.Normalize() };
+
 					shading_input.light_direction = light_dir;
-					const ColorRgba brdf{ material->Shade(shading_input,surface) };
-					final_color += calc_direct_fnc(light, light_dir) * brdf;
+					const ColorRgba brdf{ material->Shade(shading_input, surface) };
+					final_color += calc_direct_fnc(light, light_dir, light_dist) * brdf * calc_cosine_fnc(shading_input.world_normal, light_dir);
 				}
 				break;
 			}
@@ -147,7 +142,8 @@ void SoftwarePathTracer::Render()
 						-light->direction :
 						(light->origin - shading_input.shadow_origin)
 					};
-					final_color += calc_direct_fnc(light, light_dir);
+					float light_dist{ light_dir.Normalize() };
+					final_color += calc_direct_fnc(light, light_dir,light_dist) * calc_cosine_fnc(shading_input.world_normal, light_dir);
 				}
 				break;
 			}
