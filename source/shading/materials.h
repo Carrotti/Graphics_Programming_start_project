@@ -219,19 +219,21 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
-			//TODO
-			assert(false && "Not Implemented");
-			(void)input; (void)textures;
-			return {};
+			(void)textures;
+			return SurfaceProperties
+			{
+				.albedo = params_.diffuse_color,
+				.shading_normal = input.world_normal,
+				.reflectance = params_.diffuse_reflectance,
+				.alpha_params = params_.alpha_params
+			};
 		}
 
 		[[nodiscard]] ColorRgba Shade(const ShadingInput& input,
 			const SurfaceProperties& surface) const override
 		{
-			//TODO
-			assert(false && "Not Implemented");
-			(void)input; (void)surface;
-			return {};
+			(void)input;
+			return Lambert(surface.reflectance, surface.albedo);
 		}
 	};
 

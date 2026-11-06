@@ -65,6 +65,29 @@ void SoftwarePathTracer::Render()
 		ShadingInput shading_input{};
 		ColorRgba final_color{ active_scene->background_color };
 
+		auto calc_direct_fnc = [&](const Light* light, Vector3 light_dir) -> ColorRgba {
+
+			const float light_dist{ light_dir.Normalize() };
+
+			//angle
+			const float cos_theta{ Vector3::Dot(shading_input.world_normal, light_dir) };
+			if (cos_theta < 0.f) return ColorRgba{};
+
+			//shadow
+			Ray shadow_ray{
+				shading_input.shadow_origin,
+				light_dir,
+				1e-3f,
+				light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
+			};
+			RayHitRecord hit_record{};
+			if (active_scene->SceneClosestHitTest(shadow_ray, hit_record, true)) return ColorRgba{};
+
+			//radiance
+			ColorRgba radiance = CalculateRadiance(light, shading_input.world_position);
+			return radiance * cos_theta;
+			};
+
 		bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
 		if (did_hit)
 		{
@@ -73,10 +96,25 @@ void SoftwarePathTracer::Render()
 			{
 			case VisualizationMode::kNone:
 			{
-				const uint32_t idx{ closest_hit_record.object_index };
-				final_color = {
-					static_cast<float>(idx & 1), static_cast<float>((idx >> 1) & 1), static_cast<float>((idx >> 2) & 1)
-				};
+				const uint32_t obj_idx{ closest_hit_record.object_index };
+				const SceneObject& obj{ active_scene->objects.at(obj_idx) };
+				const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
+				const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
+
+
+
+				for (const Light* light : active_scene->lights_factory.GetAll())
+				{
+
+					Vector3 light_dir{
+						light->type == LightType::kDirectional ?
+						-light->direction :
+						(light->origin - shading_input.shadow_origin)
+					};
+					shading_input.light_direction = light_dir;
+					const ColorRgba brdf{ material->Shade(shading_input,surface) };
+					final_color += calc_direct_fnc(light, light_dir) * brdf;
+				}
 				break;
 			}
 			case VisualizationMode::kNormals:
@@ -102,40 +140,25 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kDirectOnly:
 			{
+				for (const Light* light : active_scene->lights_factory.GetAll())
+				{
+					Vector3 light_dir{
+						light->type == LightType::kDirectional ?
+						-light->direction :
+						(light->origin - shading_input.shadow_origin)
+					};
+					final_color += calc_direct_fnc(light, light_dir);
+				}
 				break;
 			}
-			}
-			//light
-			for (const Light* light : active_scene->lights_factory.GetAll())
-			{
-				Vector3 light_dir{
-					light->type == LightType::kDirectional ?
-					-light->direction :
-					(light->origin - shading_input.shadow_origin)
-				};
-				const float light_dist{ light_dir.Normalize() };
-				const float cos_theta{ Vector3::Dot(shading_input.world_normal, light_dir) };
-				if (cos_theta < 0.f) continue;
-
-				Ray shadow_ray{
-					shading_input.shadow_origin,
-					light_dir,
-					1e-3f,
-					light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
-				};
-				RayHitRecord hit_record{};
-				if (active_scene->SceneClosestHitTest(shadow_ray, hit_record, true)) continue;
-
-
-				ColorRgba radiance = CalculateRadiance(light, shading_input.world_position);
-				final_color += radiance * cos_theta;
 			}
 		}
 
 
 
 		final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
-		final_color = final_color.ToSrgb();
+		//everything is way too bright with srgb on
+		//final_color = final_color.ToSrgb();
 		final_color.Clamp();
 
 		// Write to surface

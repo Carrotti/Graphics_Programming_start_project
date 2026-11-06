@@ -25,19 +25,13 @@ namespace gfx
 	[[maybe_unused]]
 	static ColorRgba Lambert(const float kd, const ColorRgba& cd)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)kd; (void)cd;
-		return {};
+		return cd * kd / std::numbers::pi_v<float>;
 	}
 
 	[[maybe_unused]]
 	static ColorRgba Lambert(const ColorRgba& kd, const ColorRgba& cd)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)kd; (void)cd;
-		return {};
+		return cd * kd / std::numbers::pi_v<float>;
 	}
 
 	/**
