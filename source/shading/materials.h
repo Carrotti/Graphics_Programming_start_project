@@ -253,18 +253,43 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
-			(void)textures;
-			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
 
+
+			ColorRgba albedo{ params_.albedo_color_factor };
+			if (params_.albedo_color_texture.has_value())
+			{
+				const Texture* alb_tex{ textures.Get(params_.albedo_color_texture.value()) };
+				albedo = alb_tex->Sample(input.texture_coordinates.value());
+				if (alb_tex->IsSrgb()) albedo = albedo.ToLinear();
+			};
+			float metallic{ params_.metallic_factor }; 
+			float roughness{ params_.roughness_factor };
+			if (params_.metallic_roughness_texture.has_value())
+			{
+				const Texture* met_rou_tex{ textures.Get(params_.metallic_roughness_texture.value()) };
+				const ColorRgba metallic_roughness{ met_rou_tex->Sample(input.texture_coordinates.value()) };
+				metallic = metallic_roughness.b;
+				roughness = metallic_roughness.g;
+			};
+
+			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
+			const ColorRgba f0{ ColorRgba::Lerp(ColorRgba(f0_dielectric), albedo, metallic) };
+			
+			Vector3 normal{ input.world_normal };
+			if (params_.normal_texture.has_value())
+			{
+				//const Texture* normal_tex{ textures.Get(params_.normal_texture.value()) };
+				//normal = normal_tex->Sample(input.texture_coordinates.value());
+			}
 
 			return SurfaceProperties
 			{
-				.albedo = params_.albedo_color_factor,
-				.f0 = ColorRgba::Lerp(ColorRgba(f0_dielectric), params_.albedo_color_factor, params_.metallic_factor),
+				.albedo = albedo,
+				.f0 = f0,
 				.attenuation_color = params_.attenuation_color,
-				.shading_normal = input.world_normal,
-				.roughness = params_.roughness_factor,
-				.metallic = params_.metallic_factor,
+				.shading_normal = normal,
+				.roughness = roughness,
+				.metallic = metallic,
 				.reflectance = params_.reflectance_factor,
 				.transmission = params_.transmission_factor,
 				.ior = params_.ior,
@@ -286,7 +311,7 @@ namespace gfx
 			const float D{ NormalDistribution_GGX(n,half_vector,std::powf(r, 2)) };
 			const float G{ GeometryFunction_Smith(n, v, l, r) };
 			const float spec_denom{ 4 * std::max(Vector3::Dot(n,v), 0.f) * std::max(Vector3::Dot(n,l), 0.f) };
-			const ColorRgba specular{ (F * D * G) / std::max(0.0001f, spec_denom) };
+			const ColorRgba specular{ spec_denom <= 0.001f ? ColorRgba{} : (F * D * G) / spec_denom };
 			ColorRgba kd{ ColorRgba::White() - F };
 			kd *= 1.f - surface.metallic;
 			return Lambert(kd, surface.albedo) + specular;

@@ -248,6 +248,15 @@ namespace gfx
 				const float w{ 1 - u - v };
 				shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
 
+				if (v0.texture_coordinates.has_value() && v1.texture_coordinates.has_value() && v2.texture_coordinates.has_value())
+				{
+					const Vector2 t0{ v0.texture_coordinates.value() };
+					const Vector2 t1{ v1.texture_coordinates.value() };
+					const Vector2 t2{ v2.texture_coordinates.value() };
+					shading_input.texture_coordinates.emplace(t0.x * w + t1.x * u + t2.x * v, t0.y * w + t1.y * u + t2.y * v);
+				}
+
+				//shadow
 				Vector3 tmpu{ shading_input.world_position - v0.position };
 				Vector3 tmpv{ shading_input.world_position - v1.position };
 				Vector3 tmpw{ shading_input.world_position - v2.position };

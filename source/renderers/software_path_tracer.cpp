@@ -9,6 +9,7 @@
 #include <execution>
 #include <ranges>
 #include <intersections.h>
+#include <limits>
 using namespace gfx;
 
 // =============================================================================
@@ -69,9 +70,13 @@ void SoftwarePathTracer::Render()
 			return std::max(0.f, Vector3::Dot(normal, light_dir));
 			};
 
+		auto calc_brdf_fnc = [&](const Material* material, const ShadingInput& input, const SurfaceProperties& surface) -> ColorRgba {
+			return material->Shade(input, surface);
+			};
+
 		auto calc_direct_fnc = [&](const Light* light, const Vector3& light_dir, float light_dist) -> ColorRgba {
 			//shadow
-			Ray shadow_ray{
+			const Ray shadow_ray{
 				shading_input.shadow_origin,
 				light_dir,
 				1e-3f,
@@ -81,8 +86,7 @@ void SoftwarePathTracer::Render()
 			if (active_scene->SceneClosestHitTest(shadow_ray, hit_record, true)) return ColorRgba{};
 
 			//radiance
-			ColorRgba radiance = CalculateRadiance(light, shading_input.world_position);
-			return radiance;
+			return CalculateRadiance(light, shading_input.world_position);
 			};
 
 		bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
@@ -107,11 +111,12 @@ void SoftwarePathTracer::Render()
 					float light_dist{ light_dir.Normalize() };
 
 					shading_input.light_direction = light_dir;
-					const ColorRgba brdf{ material->Shade(shading_input, surface) };
-					final_color += calc_direct_fnc(light, light_dir, light_dist) * brdf * calc_cosine_fnc(shading_input.world_normal, light_dir);
-					final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
-					final_color = final_color.ToSrgb();
+					final_color += calc_direct_fnc(light, light_dir, light_dist)
+						* calc_brdf_fnc(material, shading_input, surface)
+						* calc_cosine_fnc(surface.shading_normal, light_dir);
 				}
+				final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
+				final_color = final_color.ToSrgb();
 				break;
 			}
 			case VisualizationMode::kNormals:
@@ -138,14 +143,20 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kUV:
 			{
+				if (!shading_input.texture_coordinates.has_value()) break;
+				final_color = {
+					shading_input.texture_coordinates.value().x,
+					shading_input.texture_coordinates.value().y,
+					0
+				};
 				break;
 			}
 			case VisualizationMode::kMetallicRoughness:
 			{
 				final_color = {
 					0.f,
-					surface.metallic,
-					surface.roughness
+					surface.roughness,
+					surface.metallic
 				};
 				break;
 			}
