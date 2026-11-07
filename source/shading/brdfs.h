@@ -14,6 +14,7 @@
 #include <vector2.h>
 #include <vector3.h>
 #include <color.h>
+#include <cmath>
 
 namespace gfx
 {
@@ -44,10 +45,7 @@ namespace gfx
 	[[maybe_unused]]
 	static ColorRgba FresnelFunction_Schlick(const Vector3& h, const Vector3& v, const ColorRgba& f0)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)h; (void)v; (void)f0;
-		return {};
+		return f0 + (ColorRgba::White() - f0) * std::powf(1 - Vector3::Dot(h, v), 5);
 	}
 
 	/**
@@ -59,10 +57,13 @@ namespace gfx
 	[[maybe_unused]]
 	static float NormalDistribution_GGX(const Vector3& n, const Vector3& h, const float roughness)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)n; (void)h; (void)roughness;
-		return {};
+		return std::powf(roughness, 2)
+			/ (std::numbers::pi_v<float>
+				*std::powf(
+					std::powf(Vector3::Dot(n, h), 2)
+					* (std::powf(roughness, 2) - 1)
+					+ 1,
+					2));
 	}
 
 	/**
@@ -76,10 +77,11 @@ namespace gfx
 	static float GeometryFunction_SchlickGGX(const Vector3& n, const Vector3& v, const float roughness,
 		[[maybe_unused]] const bool is_indirect = false)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)n; (void)v; (void)roughness;
-		return {};
+		const float k{ is_indirect ?
+			std::powf(roughness,2) / 2.f :
+			std::powf(roughness + 1, 2) / 8.f };
+		const float n_dot_v{ Vector3::Dot(n, v) };
+		return n_dot_v / (n_dot_v * (1 - k) + k);
 	}
 
 	/**
@@ -94,10 +96,8 @@ namespace gfx
 	static float GeometryFunction_Smith(const Vector3& n, const Vector3& v, const Vector3& l, const float roughness,
 		[[maybe_unused]] const bool is_indirect = false)
 	{
-		//TODO
-		assert(false && "Not Implemented");
-		(void)n; (void)v; (void)l; (void)roughness;
-		return {};
+		return GeometryFunction_SchlickGGX(n, v, roughness, is_indirect) *
+			GeometryFunction_SchlickGGX(n, l, roughness, is_indirect);
 	}
 }
 #endif

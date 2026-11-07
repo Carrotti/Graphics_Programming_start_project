@@ -18,6 +18,7 @@
 #include <texture.h>
 #include <factory.h>
 #include <debug_views.h>
+#include <cmath>
 
 namespace gfx
 {
@@ -92,8 +93,7 @@ namespace gfx
 
 	template<typename T>
 	struct has_normal_texture<T, std::void_t<decltype(std::declval<T>().normal_texture)>> :
-		std::true_type {
-	};
+		std::true_type {};
 
 	template<typename ParamType>
 	Vector3 SampleNormal(const ParamType& params, const ShadingInput& input,
@@ -168,8 +168,10 @@ namespace gfx
 
 		//--- Public Functions ---
 		[[nodiscard]] const ParamType& GetParams() const { return params_; }
-		[[nodiscard]] AlphaMode GetAlphaMode() const override 
-		{ return params_.alpha_params.mode; }
+		[[nodiscard]] AlphaMode GetAlphaMode() const override
+		{
+			return params_.alpha_params.mode;
+		}
 
 		//--- Pure Virtual Functions ---
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
@@ -188,7 +190,7 @@ namespace gfx
 		explicit UnlitMaterial(UnlitMaterialParams&& params) : MaterialTemplate(std::move(params)) {}
 
 		//--- Overrides ---
-		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input, 
+		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
 			//TODO
@@ -219,6 +221,8 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
+
+
 			(void)textures;
 			return SurfaceProperties
 			{
@@ -249,19 +253,43 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
-			//TODO
-			assert(false && "Not Implemented");
-			(void)input; (void)textures;
-			return {};
+			(void)textures;
+			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
+
+
+			return SurfaceProperties
+			{
+				.albedo = params_.albedo_color_factor,
+				.f0 = ColorRgba::Lerp(ColorRgba(f0_dielectric), params_.albedo_color_factor, params_.metallic_factor),
+				.attenuation_color = params_.attenuation_color,
+				.shading_normal = input.world_normal,
+				.roughness = params_.roughness_factor,
+				.metallic = params_.metallic_factor,
+				.reflectance = params_.reflectance_factor,
+				.transmission = params_.transmission_factor,
+				.ior = params_.ior,
+				.attenuation_distance = params_.attenuation_distance,
+				.thickness = params_.thickness_factor,
+				.alpha_params = params_.alpha_params
+			};
 		}
 
 		[[nodiscard]] ColorRgba Shade(const ShadingInput& input,
 			const SurfaceProperties& surface) const override
 		{
-			//TODO
-			assert(false && "Not Implemented");
-			(void)input; (void)surface;
-			return {};
+			const Vector3 n{ surface.shading_normal };
+			const Vector3 v{ input.view_direction };
+			const Vector3 l{ input.light_direction };
+			const float r{ surface.roughness };
+			const Vector3 half_vector{ (v + l).Normalized() };
+			const ColorRgba F{ FresnelFunction_Schlick(half_vector, v, surface.f0) };
+			const float D{ NormalDistribution_GGX(n,half_vector,std::powf(r, 2)) };
+			const float G{ GeometryFunction_Smith(n, v, l, r) };
+			const float spec_denom{ 4 * std::max(Vector3::Dot(n,v), 0.f) * std::max(Vector3::Dot(n,l), 0.f) };
+			const ColorRgba specular{ (F * D * G) / std::max(0.0001f, spec_denom) };
+			ColorRgba kd{ ColorRgba::White() - F };
+			kd *= 1.f - surface.metallic;
+			return Lambert(kd, surface.albedo) + specular;
 		}
 	};
 }

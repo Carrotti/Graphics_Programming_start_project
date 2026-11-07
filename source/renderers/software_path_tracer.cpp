@@ -109,6 +109,8 @@ void SoftwarePathTracer::Render()
 					shading_input.light_direction = light_dir;
 					const ColorRgba brdf{ material->Shade(shading_input, surface) };
 					final_color += calc_direct_fnc(light, light_dir, light_dist) * brdf * calc_cosine_fnc(shading_input.world_normal, light_dir);
+					final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
+					final_color = final_color.ToSrgb();
 				}
 				break;
 			}
@@ -124,6 +126,7 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kAlbedo:
 			{
+				final_color = surface.albedo;
 				break;
 			}
 			case VisualizationMode::kDepth:
@@ -131,6 +134,19 @@ void SoftwarePathTracer::Render()
 				const float max_depth{ 100.f };
 				const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
 				final_color = { scaled_t, scaled_t, scaled_t };
+				break;
+			}
+			case VisualizationMode::kUV:
+			{
+				break;
+			}
+			case VisualizationMode::kMetallicRoughness:
+			{
+				final_color = {
+					0.f,
+					surface.metallic,
+					surface.roughness
+				};
 				break;
 			}
 			case VisualizationMode::kDirectOnly:
@@ -143,18 +159,22 @@ void SoftwarePathTracer::Render()
 						(light->origin - shading_input.shadow_origin)
 					};
 					float light_dist{ light_dir.Normalize() };
-					final_color += calc_direct_fnc(light, light_dir,light_dist) * calc_cosine_fnc(shading_input.world_normal, light_dir);
+					final_color += calc_direct_fnc(light, light_dir, light_dist) * calc_cosine_fnc(shading_input.world_normal, light_dir);
 				}
+				break;
+			}
+			case VisualizationMode::kBounceCount:
+			{
+				break;
+			}
+			case VisualizationMode::kMax:
+			{
 				break;
 			}
 			}
 		}
 
 
-
-		final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
-		//everything is way too bright with srgb on
-		//final_color = final_color.ToSrgb();
 		final_color.Clamp();
 
 		// Write to surface
