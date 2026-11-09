@@ -24,6 +24,10 @@ namespace gfx
 		static ColorRgba CalcDirect(const Light* light, const Vector3& light_dir, 
 			float light_dist, const ShadingInput& shading_input, const Scene* scene);
 
+		ColorRgba DirectIllumination(const ShadingInput& shading_input,
+			const SurfaceProperties& surface, const Material* material,
+			const Scene* scene) const;
+
 	public:
 		//--- Construction / Destruction ---
 		SoftwarePathTracer(Context* const context);

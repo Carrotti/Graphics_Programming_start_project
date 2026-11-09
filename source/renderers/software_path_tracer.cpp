@@ -37,7 +37,7 @@ ColorRgba SoftwarePathTracer::CalcDirect(const Light* light, const Vector3& ligh
 		light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
 	};
 	RayHitRecord hit_record{};
-	if (scene->SceneClosestHitTest(shadow_ray, hit_record, true)) 
+	if (scene->SceneClosestHitTest(shadow_ray, hit_record, true))
 		return ColorRgba{};
 
 	//radiance - calculate using the light parameters directly
@@ -50,6 +50,29 @@ ColorRgba SoftwarePathTracer::CalcDirect(const Light* light, const Vector3& ligh
 	default:
 		return ColorRgba{};
 	}
+}
+
+ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shading_input, const SurfaceProperties& surface, const Material* material, const Scene* scene) const
+{
+	ColorRgba result{ ColorRgba::Black() };
+	ShadingInput input{ shading_input };
+
+	for (const Light* light : scene->lights_factory.GetAll())
+	{
+		Vector3 light_dir{ light->type == LightType::kDirectional ?
+			-light->direction :
+			(light->origin - input.shadow_origin) };
+		float light_dist{ light_dir.Normalize() };
+		input.light_direction = light_dir;
+
+		result += CalcDirect(light, light_dir, light_dist, input, scene)
+			* CalcBrdf(material, input, surface)
+			* CalcCosine(surface.shading_normal, light_dir);
+	}
+	result = result.Tonemap(context_->debug_params.tone_map_operator);
+	result = result.ToSrgb();
+
+	return result;
 }
 
 // =============================================================================
@@ -120,21 +143,7 @@ void SoftwarePathTracer::Render()
 			{
 			case VisualizationMode::kNone:
 			{
-				for (const Light* light : active_scene->lights_factory.GetAll())
-				{
-
-					Vector3 light_dir{ light->type == LightType::kDirectional ?
-						-light->direction :
-						(light->origin - shading_input.shadow_origin) };
-					float light_dist{ light_dir.Normalize() };
-
-					shading_input.light_direction = light_dir;
-					final_color += CalcDirect(light, light_dir, light_dist, shading_input, active_scene)
-						* CalcBrdf(material, shading_input, surface)
-						* CalcCosine(surface.shading_normal, light_dir);
-				}
-				final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
-				final_color = final_color.ToSrgb();
+				final_color = DirectIllumination(shading_input, surface, material, active_scene);
 				break;
 			}
 			case VisualizationMode::kNormals:
@@ -180,16 +189,7 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kDirectOnly:
 			{
-				for (const Light* light : active_scene->lights_factory.GetAll())
-				{
-					Vector3 light_dir{
-						light->type == LightType::kDirectional ?
-						-light->direction :
-						(light->origin - shading_input.shadow_origin)
-					};
-					float light_dist{ light_dir.Normalize() };
-					final_color += CalcDirect(light, light_dir, light_dist, shading_input, active_scene) * CalcCosine(shading_input.world_normal, light_dir);
-				}
+				final_color = DirectIllumination(shading_input, surface, material, active_scene);
 				break;
 			}
 			case VisualizationMode::kBounceCount:
