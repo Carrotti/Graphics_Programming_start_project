@@ -16,6 +16,14 @@ namespace gfx
 	//--- Software Path Tracer ---
 	class SoftwarePathTracer final : public Renderer
 	{
+	private:
+		//--- Private Helper Functions ---
+		static float CalcCosine(const Vector3& normal, const Vector3& light_dir);
+		static ColorRgba CalcBrdf(const Material* material, const ShadingInput& input, 
+			const SurfaceProperties& surface);
+		static ColorRgba CalcDirect(const Light* light, const Vector3& light_dir, 
+			float light_dist, const ShadingInput& shading_input, const Scene* scene);
+
 	public:
 		//--- Construction / Destruction ---
 		SoftwarePathTracer(Context* const context);

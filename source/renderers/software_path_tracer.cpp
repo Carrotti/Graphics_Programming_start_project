@@ -13,6 +13,46 @@
 using namespace gfx;
 
 // =============================================================================
+// Private Helper Functions
+// =============================================================================
+float SoftwarePathTracer::CalcCosine(const Vector3& normal, const Vector3& light_dir)
+{
+	return std::max(0.f, Vector3::Dot(normal, light_dir));
+}
+
+ColorRgba SoftwarePathTracer::CalcBrdf(const Material* material, const ShadingInput& input,
+	const SurfaceProperties& surface)
+{
+	return material->Shade(input, surface);
+}
+
+ColorRgba SoftwarePathTracer::CalcDirect(const Light* light, const Vector3& light_dir,
+	float light_dist, const ShadingInput& shading_input, const Scene* scene)
+{
+	//shadow
+	const Ray shadow_ray{
+		shading_input.shadow_origin,
+		light_dir,
+		1e-3f,
+		light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
+	};
+	RayHitRecord hit_record{};
+	if (scene->SceneClosestHitTest(shadow_ray, hit_record, true)) 
+		return ColorRgba{};
+
+	//radiance - calculate using the light parameters directly
+	switch (light->type)
+	{
+	case LightType::kPoint:
+		return light->color * light->intensity / (light->origin - shading_input.world_position).SqrMagnitude();
+	case LightType::kDirectional:
+		return light->color * light->intensity;
+	default:
+		return ColorRgba{};
+	}
+}
+
+// =============================================================================
 // Construction / Destruction
 // =============================================================================
 SoftwarePathTracer::SoftwarePathTracer(Context* const context)
@@ -66,29 +106,6 @@ void SoftwarePathTracer::Render()
 		ShadingInput shading_input{};
 		ColorRgba final_color{ active_scene->background_color };
 
-		auto calc_cosine_fnc = [&](const Vector3& normal, const Vector3& light_dir) -> float {
-			return std::max(0.f, Vector3::Dot(normal, light_dir));
-			};
-
-		auto calc_brdf_fnc = [&](const Material* material, const ShadingInput& input, const SurfaceProperties& surface) -> ColorRgba {
-			return material->Shade(input, surface);
-			};
-
-		auto calc_direct_fnc = [&](const Light* light, const Vector3& light_dir, float light_dist) -> ColorRgba {
-			//shadow
-			const Ray shadow_ray{
-				shading_input.shadow_origin,
-				light_dir,
-				1e-3f,
-				light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
-			};
-			RayHitRecord hit_record{};
-			if (active_scene->SceneClosestHitTest(shadow_ray, hit_record, true)) return ColorRgba{};
-
-			//radiance
-			return CalculateRadiance(light, shading_input.world_position);
-			};
-
 		bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
 		if (did_hit)
 		{
@@ -112,9 +129,9 @@ void SoftwarePathTracer::Render()
 					float light_dist{ light_dir.Normalize() };
 
 					shading_input.light_direction = light_dir;
-					final_color += calc_direct_fnc(light, light_dir, light_dist)
-						* calc_brdf_fnc(material, shading_input, surface)
-						* calc_cosine_fnc(surface.shading_normal, light_dir);
+					final_color += CalcDirect(light, light_dir, light_dist, shading_input, active_scene)
+						* CalcBrdf(material, shading_input, surface)
+						* CalcCosine(surface.shading_normal, light_dir);
 				}
 				final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
 				final_color = final_color.ToSrgb();
@@ -171,7 +188,7 @@ void SoftwarePathTracer::Render()
 						(light->origin - shading_input.shadow_origin)
 					};
 					float light_dist{ light_dir.Normalize() };
-					final_color += calc_direct_fnc(light, light_dir, light_dist) * calc_cosine_fnc(shading_input.world_normal, light_dir);
+					final_color += CalcDirect(light, light_dir, light_dist, shading_input, active_scene) * CalcCosine(shading_input.world_normal, light_dir);
 				}
 				break;
 			}
