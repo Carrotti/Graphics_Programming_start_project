@@ -10,11 +10,30 @@
 #include <ranges>
 #include <intersections.h>
 #include <limits>
+#include <cstdint>
 using namespace gfx;
 
 // =============================================================================
 // Private Helper Functions
 // =============================================================================
+namespace 
+{
+
+	uint32_t LowBias32(uint32_t h)
+	{
+		h ^= h >> 16; h *= 0x7feb352du;
+		h ^= h >> 15; h *= 0x846ca68bu;
+		h ^= h >> 16;
+		return h;
+	}
+
+	float HashToFloat(const uint32_t h)
+	{
+		return static_cast<float>(h >> 8) * (1.f / 16777216.f);
+	}
+}
+
+
 float SoftwarePathTracer::CalcCosine(const Vector3& normal, const Vector3& light_dir)
 {
 	return std::max(0.f, Vector3::Dot(normal, light_dir));
@@ -204,8 +223,14 @@ void SoftwarePathTracer::Render()
 		}
 
 
-		final_color.Clamp();
+		//TEMP
+		const float u{ HashToFloat(LowBias32(pixel_idx)) };
+		final_color = { u,u,u };
 
+
+
+
+		final_color.Clamp();
 		// Write to surface
 		surface_info.pixel_buffer[px + (py * surface_info.width)] = SDL_MapRGB(
 			surface_info.pixel_format_details, nullptr,
