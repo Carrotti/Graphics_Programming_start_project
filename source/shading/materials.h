@@ -19,6 +19,7 @@
 #include <factory.h>
 #include <debug_views.h>
 #include <cmath>
+#include <matrix.h>
 
 namespace gfx
 {
@@ -99,16 +100,16 @@ namespace gfx
 	Vector3 SampleNormal(const ParamType& params, const ShadingInput& input,
 		const Factory<Texture>& textures)
 	{
-		//TODO
 		if constexpr (has_normal_texture<ParamType>::value)
 		{
 			if (params.normal_texture.has_value() && input.texture_coordinates.has_value()
 				&& input.world_tangent.has_value() && input.world_bitangent.has_value())
 			{
-				//TODO
-				assert(false && "Not Implemented");
-				(void)textures;
-				return {};
+				const Texture* normal_tex{ textures.Get(params.normal_texture.value()) };
+				const Vector3 tangent_normal{ normal_tex->SampleNormal(input.texture_coordinates.value()) };
+				const Matrix tbn(input.world_tangent.value(), input.world_bitangent.value(), input.world_normal, Vector3{});
+				return tbn.TransformVector(tangent_normal).Normalized();
+
 			}
 		}
 		return input.world_normal; // Default fallback.
@@ -278,8 +279,7 @@ namespace gfx
 			Vector3 normal{ input.world_normal };
 			if (params_.normal_texture.has_value())
 			{
-				//const Texture* normal_tex{ textures.Get(params_.normal_texture.value()) };
-				//normal = normal_tex->Sample(input.texture_coordinates.value());
+				normal = SampleNormal(params_, input, textures);
 			}
 
 			return SurfaceProperties

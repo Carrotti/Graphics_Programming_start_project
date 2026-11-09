@@ -97,6 +97,7 @@ void SoftwarePathTracer::Render()
 			const SceneObject& obj{ active_scene->objects.at(obj_idx) };
 			const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
 			const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
+			shading_input.world_normal = surface.shading_normal;
 
 			switch (context_->debug_params.visualization_mode)
 			{

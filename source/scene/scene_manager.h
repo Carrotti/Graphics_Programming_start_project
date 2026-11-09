@@ -247,6 +247,8 @@ namespace gfx
 				const float v{ hit.barycentric_coordinates.value()[1] };
 				const float w{ 1 - u - v };
 				shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
+				shading_input.world_bitangent = (w * v0.bitangent.value() + u * v1.bitangent.value() + v * v2.bitangent.value()).Normalized();
+				shading_input.world_tangent = (w * v0.tangent.value() + u * v1.tangent.value() + v * v2.tangent.value()).Normalized();
 
 				if (v0.texture_coordinates.has_value() && v1.texture_coordinates.has_value() && v2.texture_coordinates.has_value())
 				{
