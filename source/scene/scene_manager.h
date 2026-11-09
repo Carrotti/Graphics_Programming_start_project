@@ -177,9 +177,9 @@ namespace gfx
 								if (did_hit && candidate_closest_hit.t < closest_hit.t && !ignore_record)
 								{
 									candidate_closest_hit.vertex_indices = {
-										triangle_mesh->indices[3*tri_idx],
-										triangle_mesh->indices[3*tri_idx + 1],
-										triangle_mesh->indices[3*tri_idx + 2]
+										triangle_mesh->indices[3 * tri_idx],
+										triangle_mesh->indices[3 * tri_idx + 1],
+										triangle_mesh->indices[3 * tri_idx + 2]
 									};
 								}
 								save_closest_hit();
@@ -208,7 +208,7 @@ namespace gfx
 			const Ray& ray{ hit.ray };
 			shading_input.view_direction = -ray.direction;
 			shading_input.world_position = ray.origin + ray.direction * hit.t;
-			
+
 
 			const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
 			switch (prim->type)
@@ -247,8 +247,12 @@ namespace gfx
 				const float v{ hit.barycentric_coordinates.value()[1] };
 				const float w{ 1 - u - v };
 				shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
-				shading_input.world_bitangent = (w * v0.bitangent.value() + u * v1.bitangent.value() + v * v2.bitangent.value()).Normalized();
-				shading_input.world_tangent = (w * v0.tangent.value() + u * v1.tangent.value() + v * v2.tangent.value()).Normalized();
+				if (v0.bitangent.has_value() && v1.bitangent.has_value() && v2.bitangent.has_value()
+					&& v0.tangent.has_value() && v1.tangent.has_value() && v2.tangent.has_value())
+				{
+					shading_input.world_bitangent = (w * v0.bitangent.value() + u * v1.bitangent.value() + v * v2.bitangent.value()).Normalized();
+					shading_input.world_tangent = (w * v0.tangent.value() + u * v1.tangent.value() + v * v2.tangent.value()).Normalized();
+				}
 
 				if (v0.texture_coordinates.has_value() && v1.texture_coordinates.has_value() && v2.texture_coordinates.has_value())
 				{
