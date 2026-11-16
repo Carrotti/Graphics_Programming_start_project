@@ -35,11 +35,12 @@ namespace gfx
 			const SurfaceProperties& surface, const Material* material,
 			const Scene* scene) const;
 
-		uint32_t ao_sample_count_{ 64 };
+		uint32_t ao_sample_count_{ 32 };
 		float ao_radius{ 10.f };
 
 		float TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const;
 		static HemisphereSample UniformSampleHemisphere(const Vector3& normal, uint32_t seed);
+		static HemisphereSample CosineSampleHemisphere(const Vector3& normal, uint32_t seed);
 
 	public:
 		//--- Construction / Destruction ---

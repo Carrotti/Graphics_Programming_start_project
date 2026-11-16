@@ -110,8 +110,11 @@ float gfx::SoftwarePathTracer::TraceAO(const ShadingInput& shading_input, uint32
 	for (uint32_t s{ 0 }; s < ao_sample_count_; ++s)
 	{
 		const uint32_t ao_seed{ pixel_index * 1973u + s * 6133u };
-
-		const HemisphereSample sample{ UniformSampleHemisphere(shading_input.world_normal, ao_seed) };
+		
+		const bool use_uniform{ context_->debug_params.sampling_strategy == SamplingStrategy::kUniform };
+		const HemisphereSample sample{ use_uniform ?
+			UniformSampleHemisphere(shading_input.world_normal, ao_seed) :
+			CosineSampleHemisphere(shading_input.world_normal, ao_seed) };
 		const Ray ao_ray
 		{
 			shading_input.shadow_origin,
@@ -139,12 +142,28 @@ HemisphereSample gfx::SoftwarePathTracer::UniformSampleHemisphere(const Vector3&
 	h = LowBias32(h);
 	const float u2{ HashToFloat(h) };
 
-	const float cos_theta{ std::sqrt(1 - u2) };
-	const float sin_theta{ std::sqrt(u2) };
+	const float cos_theta{ u2 };
+	const float sin_theta{ std::sqrt(1 - u2 * u2) };
 	const float phi{ 2 * std::numbers::pi_v<float> * u1 };
 	const Vector3 local_dir{ std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, cos_theta };
 	const float pdf{ 1.f / (2 * std::numbers::pi_v<float>) };
 	return { LocalToWorld(local_dir, normal), pdf };
+}
+
+HemisphereSample gfx::SoftwarePathTracer::CosineSampleHemisphere(const Vector3& normal, uint32_t seed)
+{
+	uint32_t h{ LowBias32(seed) };
+	const float u1{ HashToFloat(h) };
+	h = LowBias32(h);
+	const float u2{ HashToFloat(h) };
+
+	const float cos_theta{ std::sqrt(1 - u2) };
+	const float sin_theta{ std::sqrt(u2) };
+	const float phi{ 2 * std::numbers::pi_v<float> * u1 };
+	const Vector3 local_dir{ std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, cos_theta };
+	const float pdf{ cos_theta / std::numbers::pi_v<float> };
+	return { LocalToWorld(local_dir, normal), pdf };
+
 }
 
 // =============================================================================
