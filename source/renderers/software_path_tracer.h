@@ -38,6 +38,8 @@ namespace gfx
 		ColorRgba TracePath(const Ray& ray, const Scene* scene,
 			uint32_t& hash_state, int max_bounces = 8) const;
 
+		static ColorRgba EnvironmentRadiance(const Scene* scene, const Vector3& direction);
+
 		uint32_t ao_sample_count_{ 1 };
 		float ao_radius_{ 10.f };
 
