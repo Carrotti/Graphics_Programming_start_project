@@ -81,38 +81,63 @@ ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shadin
 
 	return result;
 }
-/*
-float gfx::SoftwarePathTracer::TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const
-{
-	float visibility_sum{};
-	for (uint32_t s{ 0 }; s < ao_sample_count_; ++s)
-	{
-		const uint32_t ao_seed{ pixel_index * 1973u + s * 6133u + context_->debug_params.accumulated_samples * 2654435761u };
 
-		const bool use_uniform{ context_->debug_params.sampling_strategy == SamplingStrategy::kUniform };
-		const HemisphereSample sample{ use_uniform ?
-			UniformSampleHemisphere(shading_input.world_normal, ao_seed) :
-			CosineSampleHemisphere(shading_input.world_normal, ao_seed) };
-		const Ray ao_ray
+ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene, uint32_t& hash_state, int max_bounces) const
+{
+	ColorRgba accumulated_color{ ColorRgba::Black() };
+	ColorRgba throughput{ ColorRgba::White() };
+	Ray current_ray{ ray };
+	int bounce{};
+	while (bounce < max_bounces)
+	{
+		RayHitRecord hit{};
+		if (!scene->SceneClosestHitTest(current_ray, hit))
+		{
+			accumulated_color += scene->background_color;
+			break;
+		}
+
+		ShadingInput shading_input{ scene->ConstructShadingInput(hit) };
+		const uint32_t obj_idx{ hit.object_index };
+		const SceneObject& obj{ scene->objects.at(obj_idx) };
+		const Material* material{ scene->materials_factory.Get(obj.material_index) };
+		const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
+		shading_input.world_normal = surface.shading_normal;
+
+		HemisphereSample sample{};
+		switch (context_->debug_params.sampling_strategy)
+		{
+		case SamplingStrategy::kUniform:
+			sample = UniformSampleHemisphere(shading_input.world_normal, hash_state);
+		default:
+			sample = CosineSampleHemisphere(shading_input.world_normal, hash_state);
+		}
+
+		const float n_dot_l{ Vector3::Dot(shading_input.world_normal, sample.direction) };
+		if (n_dot_l <= 0.f || sample.pdf < 1e-6f) break;
+
+		shading_input.light_direction = sample.direction;
+
+		ColorRgba brdf{ material->Shade(shading_input, surface) };
+		BounceSample bounce_sample{
+			sample.direction,
+			CalcBrdf(material, shading_input, surface) * n_dot_l / sample.pdf
+		};
+
+		throughput *= bounce_sample.weight;
+
+		current_ray = Ray
 		{
 			shading_input.shadow_origin,
 			sample.direction,
 			0.001f,
-			ao_radius_
+			std::numeric_limits<float>::max()
 		};
-		RayHitRecord ao_hit{};
-		const Scene* active_scene{ context_->scene_manager->GetActiveScene() };
-		if (active_scene->SceneClosestHitTest(ao_ray, ao_hit, true)) continue;
 
-		const float cos_theta{ std::max(0.f,
-			Vector3::Dot(sample.direction, shading_input.world_normal)) };
-		const float f{ cos_theta / std::numbers::pi_v<float> };
-		if (sample.pdf > 0.f)
-			visibility_sum += f / sample.pdf;
+		++bounce;
 	}
-	return visibility_sum / static_cast<float>(ao_sample_count_);
+	return accumulated_color;
 }
-*/
 
 Vector2 gfx::SoftwarePathTracer::GenerateSubpixelJitter([[maybe_unused]] uint32_t pixel_index, uint32_t& hash_state) const
 {
@@ -196,7 +221,7 @@ void SoftwarePathTracer::Render()
 
 		RayHitRecord closest_hit_record{};
 		ShadingInput shading_input{};
-		ColorRgba final_color{ active_scene->background_color };
+		ColorRgba sample_color{ active_scene->background_color };
 
 		bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
 		if (did_hit)
@@ -212,17 +237,13 @@ void SoftwarePathTracer::Render()
 			{
 			case VisualizationMode::kNone:
 			{
-				final_color = DirectIllumination(shading_input, surface, material, active_scene);
-				//const float ao{ TraceAO(shading_input, pixel_idx) };
-
-				//final_color *= ao;
-				//final_color = { ao, ao, ao };
+				sample_color = TracePath(view_ray, active_scene, hash_state);
 				break;
 			}
 			case VisualizationMode::kNormals:
 			{
 				const Vector3& n = shading_input.world_normal;
-				final_color = {
+				sample_color = {
 					(n.x + 1.f) * 0.5f,
 					(n.y + 1.f) * 0.5f,
 					(n.z + 1.f) * 0.5f
@@ -231,20 +252,20 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kAlbedo:
 			{
-				final_color = surface.albedo;
+				sample_color = surface.albedo;
 				break;
 			}
 			case VisualizationMode::kDepth:
 			{
 				const float max_depth{ 100.f };
 				const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
-				final_color = { scaled_t, scaled_t, scaled_t };
+				sample_color = { scaled_t, scaled_t, scaled_t };
 				break;
 			}
 			case VisualizationMode::kUV:
 			{
 				if (!shading_input.texture_coordinates.has_value()) break;
-				final_color = {
+				sample_color = {
 					shading_input.texture_coordinates.value().x,
 					shading_input.texture_coordinates.value().y,
 					0
@@ -253,7 +274,7 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kMetallicRoughness:
 			{
-				final_color = {
+				sample_color = {
 					0.f,
 					surface.roughness,
 					surface.metallic
@@ -262,7 +283,7 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kDirectOnly:
 			{
-				final_color = DirectIllumination(shading_input, surface, material, active_scene);
+				sample_color = DirectIllumination(shading_input, surface, material, active_scene);
 				break;
 			}
 			case VisualizationMode::kBounceCount:
@@ -276,16 +297,20 @@ void SoftwarePathTracer::Render()
 			}
 		}
 
-		accumulation_buffer_[pixel_idx] += final_color;
+		if (!std::isfinite(sample_color.r) || !std::isfinite(sample_color.g) ||
+			!std::isfinite(sample_color.b) || !std::isfinite(sample_color.a))
+			sample_color = ColorRgba::Black();
+
+
+		accumulation_buffer_[pixel_idx] += sample_color;
 
 		const float inv_frames{ 1.f / static_cast<float>(context_->debug_params.accumulated_samples + 1.f) };
-		final_color = accumulation_buffer_[pixel_idx] * inv_frames;
+		ColorRgba final_color{ accumulation_buffer_[pixel_idx] * inv_frames };
 
 
 		if (context_->debug_params.visualization_mode == VisualizationMode::kNone ||
 			context_->debug_params.visualization_mode == VisualizationMode::kDirectOnly)
 		{
-
 			final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
 			final_color = final_color.ToSrgb();
 		}

@@ -13,7 +13,11 @@
 
 namespace gfx
 {
-
+	struct BounceSample
+	{
+		Vector3 direction{};
+		ColorRgba weight{ ColorRgba::Black() };
+	};
 
 	//--- Software Path Tracer ---
 	class SoftwarePathTracer final : public Renderer
@@ -30,10 +34,13 @@ namespace gfx
 			const SurfaceProperties& surface, const Material* material,
 			const Scene* scene) const;
 
+
+		ColorRgba TracePath(const Ray& ray, const Scene* scene,
+			uint32_t& hash_state, int max_bounces = 8) const;
+
 		uint32_t ao_sample_count_{ 1 };
 		float ao_radius_{ 10.f };
 
-		//float TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const;
 
 		VisualizationMode last_vis_mode_{};
 		SamplingStrategy last_sampling_strategy_{ SamplingStrategy::kCosine };
