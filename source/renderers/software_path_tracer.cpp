@@ -14,35 +14,14 @@
 #include <cstdlib>
 #include <numbers>
 #include <vector2.h>
+#include <samplers.h>
+
 using namespace gfx;
 
 // =============================================================================
 // Private Helper Functions
 // =============================================================================
-namespace
-{
 
-	uint32_t LowBias32(uint32_t h)
-	{
-		h ^= h >> 16; h *= 0x7feb352du;
-		h ^= h >> 15; h *= 0x846ca68bu;
-		h ^= h >> 16;
-		return h;
-	}
-
-	float HashToFloat(const uint32_t h)
-	{
-		return static_cast<float>(h >> 8) * (1.f / 16777216.f);
-	}
-
-	Vector3 LocalToWorld(const Vector3& local_dir, const Vector3& normal)
-	{
-		const Vector3 helper{ std::abs(normal.x) > 0.9 ? Vector3::UnitY() : Vector3::UnitX() };
-		const Vector3 t{ Vector3::Cross(normal, helper).Normalized() };
-		const Vector3 b{ Vector3::Cross(normal, t) };
-		return t * local_dir.x + b * local_dir.y + normal * local_dir.z;
-	}
-}
 
 
 float SoftwarePathTracer::CalcCosine(const Vector3& normal, const Vector3& light_dir)
@@ -102,7 +81,7 @@ ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shadin
 
 	return result;
 }
-
+/*
 float gfx::SoftwarePathTracer::TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const
 {
 	float visibility_sum{};
@@ -133,46 +112,12 @@ float gfx::SoftwarePathTracer::TraceAO(const ShadingInput& shading_input, uint32
 	}
 	return visibility_sum / static_cast<float>(ao_sample_count_);
 }
+*/
 
-HemisphereSample gfx::SoftwarePathTracer::UniformSampleHemisphere(const Vector3& normal, uint32_t seed)
+Vector2 gfx::SoftwarePathTracer::GenerateSubpixelJitter([[maybe_unused]] uint32_t pixel_index, uint32_t& hash_state) const
 {
-	uint32_t h{ LowBias32(seed) };
-	const float u1{ HashToFloat(h) };
-	h = LowBias32(h);
-	const float u2{ HashToFloat(h) };
-
-	const float cos_theta{ u2 };
-	const float sin_theta{ std::sqrt(1 - u2 * u2) };
-	const float phi{ 2 * std::numbers::pi_v<float> *u1 };
-	const Vector3 local_dir{ std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, cos_theta };
-	const float pdf{ 1.f / (2 * std::numbers::pi_v<float>) };
-	return { LocalToWorld(local_dir, normal), pdf };
-}
-
-HemisphereSample gfx::SoftwarePathTracer::CosineSampleHemisphere(const Vector3& normal, uint32_t seed)
-{
-	uint32_t h{ LowBias32(seed) };
-	const float u1{ HashToFloat(h) };
-	h = LowBias32(h);
-	const float u2{ HashToFloat(h) };
-
-	const float cos_theta{ std::sqrt(1 - u2) };
-	const float sin_theta{ std::sqrt(u2) };
-	const float phi{ 2 * std::numbers::pi_v<float> *u1 };
-	const Vector3 local_dir{ std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, cos_theta };
-	const float pdf{ cos_theta / std::numbers::pi_v<float> };
-	return { LocalToWorld(local_dir, normal), pdf };
-
-}
-
-Vector2 gfx::SoftwarePathTracer::GenerateSubpixelJitter(uint32_t pixel_index) const
-{
-	const uint32_t frame{ context_->debug_params.accumulated_samples };
-	const uint32_t frame_hash{ LowBias32(frame + 0x9E3779B9u) };
-	uint32_t h{ LowBias32(pixel_index ^ frame_hash) };
-	const float jx{ HashToFloat(h) };
-	h = LowBias32(h);
-	const float jy{ HashToFloat(h) };
+	const float jx{ NextFloat(hash_state) };
+	const float jy{ NextFloat(hash_state) };
 	return { jx,jy };
 }
 
@@ -208,21 +153,27 @@ void SoftwarePathTracer::Render()
 
 	const VisualizationMode current_vis_mode{ context_->debug_params.visualization_mode };
 	const SamplingStrategy current_sampling{ context_->debug_params.sampling_strategy };
+	const ToneMapOperator current_tone_map{ context_->debug_params.tone_map_operator };
 	if (active_scene->scene_changed || accumulation_buffer_.size() != total_indices ||
 		current_vis_mode != last_vis_mode_ ||
-		current_sampling != last_sampling_strategy_)
+		current_sampling != last_sampling_strategy_ ||
+		current_tone_map != last_tone_map)
 	{
 		context_->debug_params.accumulated_samples = 0;
 		accumulation_buffer_.assign(total_indices, ColorRgba::Black());
 		last_vis_mode_ = current_vis_mode;
 		last_sampling_strategy_ = current_sampling;
+		last_tone_map = current_tone_map;
 	}
 
-	if (context_->debug_params.accumulated_samples >= context_->debug_params.max_samples)
+	if (context_->debug_params.accumulated_samples >= context_->debug_params.max_samples ||
+		context_->debug_params.sampling_paused)
 		return;
 
 
 	auto per_pixel_fnc = [&](const uint32_t pixel_idx) {
+
+		uint32_t hash_state{ LowBias32(pixel_idx ^ (context_->debug_params.accumulated_samples * 2654435761u)) };
 
 		const uint32_t px{ pixel_idx % surface_info.width };
 		const uint32_t py{ pixel_idx / surface_info.width };
@@ -236,7 +187,7 @@ void SoftwarePathTracer::Render()
 #endif
 
 		//calculate ray using NDC
-		const Vector2 jitter{ GenerateSubpixelJitter(pixel_idx) };
+		const Vector2 jitter{ GenerateSubpixelJitter(pixel_idx, hash_state) };
 		float x_ndc{ (2.f * ((static_cast<float>(px) + jitter.x) / surface_info.width) - 1.f) * aspect_ratio * FOV };
 		float y_ndc{ (1.f - 2.f * ((static_cast<float>(py) + jitter.y) / surface_info.height)) * FOV };
 		Vector3 ray_direction{ x_ndc, y_ndc, 1 };
@@ -261,8 +212,11 @@ void SoftwarePathTracer::Render()
 			{
 			case VisualizationMode::kNone:
 			{
-				const float ao{ TraceAO(shading_input, pixel_idx) };
-				final_color = { ao, ao, ao };
+				final_color = DirectIllumination(shading_input, surface, material, active_scene);
+				//const float ao{ TraceAO(shading_input, pixel_idx) };
+
+				//final_color *= ao;
+				//final_color = { ao, ao, ao };
 				break;
 			}
 			case VisualizationMode::kNormals:

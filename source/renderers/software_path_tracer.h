@@ -13,11 +13,6 @@
 
 namespace gfx
 {
-	struct HemisphereSample
-	{
-		Vector3 direction{};
-		float pdf{};
-	};
 
 
 	//--- Software Path Tracer ---
@@ -38,15 +33,14 @@ namespace gfx
 		uint32_t ao_sample_count_{ 1 };
 		float ao_radius_{ 10.f };
 
-		float TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const;
-		static HemisphereSample UniformSampleHemisphere(const Vector3& normal, uint32_t seed);
-		static HemisphereSample CosineSampleHemisphere(const Vector3& normal, uint32_t seed);
+		//float TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const;
 
 		VisualizationMode last_vis_mode_{};
 		SamplingStrategy last_sampling_strategy_{ SamplingStrategy::kCosine };
+		ToneMapOperator last_tone_map{};
 		std::vector<ColorRgba> accumulation_buffer_{};
 
-		Vector2 GenerateSubpixelJitter(uint32_t pixel_index) const;
+		Vector2 GenerateSubpixelJitter(uint32_t pixel_index, uint32_t& hash_state) const;
 
 	public:
 		//--- Construction / Destruction ---
