@@ -13,12 +13,13 @@
 #include <cstdint>
 #include <cstdlib>
 #include <numbers>
+#include <vector2.h>
 using namespace gfx;
 
 // =============================================================================
 // Private Helper Functions
 // =============================================================================
-namespace 
+namespace
 {
 
 	uint32_t LowBias32(uint32_t h)
@@ -98,8 +99,6 @@ ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shadin
 			* CalcBrdf(material, input, surface)
 			* CalcCosine(surface.shading_normal, light_dir);
 	}
-	result = result.Tonemap(context_->debug_params.tone_map_operator);
-	result = result.ToSrgb();
 
 	return result;
 }
@@ -109,8 +108,8 @@ float gfx::SoftwarePathTracer::TraceAO(const ShadingInput& shading_input, uint32
 	float visibility_sum{};
 	for (uint32_t s{ 0 }; s < ao_sample_count_; ++s)
 	{
-		const uint32_t ao_seed{ pixel_index * 1973u + s * 6133u };
-		
+		const uint32_t ao_seed{ pixel_index * 1973u + s * 6133u + context_->debug_params.accumulated_samples * 2654435761u };
+
 		const bool use_uniform{ context_->debug_params.sampling_strategy == SamplingStrategy::kUniform };
 		const HemisphereSample sample{ use_uniform ?
 			UniformSampleHemisphere(shading_input.world_normal, ao_seed) :
@@ -120,12 +119,12 @@ float gfx::SoftwarePathTracer::TraceAO(const ShadingInput& shading_input, uint32
 			shading_input.shadow_origin,
 			sample.direction,
 			0.001f,
-			ao_radius
+			ao_radius_
 		};
 		RayHitRecord ao_hit{};
 		const Scene* active_scene{ context_->scene_manager->GetActiveScene() };
 		if (active_scene->SceneClosestHitTest(ao_ray, ao_hit, true)) continue;
-		
+
 		const float cos_theta{ std::max(0.f,
 			Vector3::Dot(sample.direction, shading_input.world_normal)) };
 		const float f{ cos_theta / std::numbers::pi_v<float> };
@@ -144,7 +143,7 @@ HemisphereSample gfx::SoftwarePathTracer::UniformSampleHemisphere(const Vector3&
 
 	const float cos_theta{ u2 };
 	const float sin_theta{ std::sqrt(1 - u2 * u2) };
-	const float phi{ 2 * std::numbers::pi_v<float> * u1 };
+	const float phi{ 2 * std::numbers::pi_v<float> *u1 };
 	const Vector3 local_dir{ std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, cos_theta };
 	const float pdf{ 1.f / (2 * std::numbers::pi_v<float>) };
 	return { LocalToWorld(local_dir, normal), pdf };
@@ -159,11 +158,22 @@ HemisphereSample gfx::SoftwarePathTracer::CosineSampleHemisphere(const Vector3& 
 
 	const float cos_theta{ std::sqrt(1 - u2) };
 	const float sin_theta{ std::sqrt(u2) };
-	const float phi{ 2 * std::numbers::pi_v<float> * u1 };
+	const float phi{ 2 * std::numbers::pi_v<float> *u1 };
 	const Vector3 local_dir{ std::cos(phi) * sin_theta, std::sin(phi) * sin_theta, cos_theta };
 	const float pdf{ cos_theta / std::numbers::pi_v<float> };
 	return { LocalToWorld(local_dir, normal), pdf };
 
+}
+
+Vector2 gfx::SoftwarePathTracer::GenerateSubpixelJitter(uint32_t pixel_index) const
+{
+	const uint32_t frame{ context_->debug_params.accumulated_samples };
+	const uint32_t frame_hash{ LowBias32(frame + 0x9E3779B9u) };
+	uint32_t h{ LowBias32(pixel_index ^ frame_hash) };
+	const float jx{ HashToFloat(h) };
+	h = LowBias32(h);
+	const float jy{ HashToFloat(h) };
+	return { jx,jy };
 }
 
 // =============================================================================
@@ -196,6 +206,22 @@ void SoftwarePathTracer::Render()
 	uint32_t total_indices{ surface_info.height * surface_info.width };
 	auto pixel_indices{ std::views::iota(0u, total_indices) };
 
+	const VisualizationMode current_vis_mode{ context_->debug_params.visualization_mode };
+	const SamplingStrategy current_sampling{ context_->debug_params.sampling_strategy };
+	if (active_scene->scene_changed || accumulation_buffer_.size() != total_indices ||
+		current_vis_mode != last_vis_mode_ ||
+		current_sampling != last_sampling_strategy_)
+	{
+		context_->debug_params.accumulated_samples = 0;
+		accumulation_buffer_.assign(total_indices, ColorRgba::Black());
+		last_vis_mode_ = current_vis_mode;
+		last_sampling_strategy_ = current_sampling;
+	}
+
+	if (context_->debug_params.accumulated_samples >= context_->debug_params.max_samples)
+		return;
+
+
 	auto per_pixel_fnc = [&](const uint32_t pixel_idx) {
 
 		const uint32_t px{ pixel_idx % surface_info.width };
@@ -210,8 +236,9 @@ void SoftwarePathTracer::Render()
 #endif
 
 		//calculate ray using NDC
-		float x_ndc{ ((2.f * (px + 0.5f) / surface_info.width) - 1.f) * aspect_ratio * FOV };
-		float y_ndc{ (1.f - (2.f * (py + 0.5f) / surface_info.height)) * FOV };
+		const Vector2 jitter{ GenerateSubpixelJitter(pixel_idx) };
+		float x_ndc{ (2.f * ((static_cast<float>(px) + jitter.x) / surface_info.width) - 1.f) * aspect_ratio * FOV };
+		float y_ndc{ (1.f - 2.f * ((static_cast<float>(py) + jitter.y) / surface_info.height)) * FOV };
 		Vector3 ray_direction{ x_ndc, y_ndc, 1 };
 		Ray world_ray{ .direction = ray_direction.Normalized() };
 		Ray view_ray{ camera_view.TransformRay(world_ray) };
@@ -295,7 +322,19 @@ void SoftwarePathTracer::Render()
 			}
 		}
 
+		accumulation_buffer_[pixel_idx] += final_color;
 
+		const float inv_frames{ 1.f / static_cast<float>(context_->debug_params.accumulated_samples + 1.f) };
+		final_color = accumulation_buffer_[pixel_idx] * inv_frames;
+
+
+		if (context_->debug_params.visualization_mode == VisualizationMode::kNone ||
+			context_->debug_params.visualization_mode == VisualizationMode::kDirectOnly)
+		{
+
+			final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
+			final_color = final_color.ToSrgb();
+		}
 
 
 		final_color.Clamp();
@@ -313,6 +352,8 @@ void SoftwarePathTracer::Render()
 #else
 	std::for_each(std::execution::par, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
 #endif
+
+	++context_->debug_params.accumulated_samples;
 
 }
 

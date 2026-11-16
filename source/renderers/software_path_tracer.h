@@ -35,12 +35,18 @@ namespace gfx
 			const SurfaceProperties& surface, const Material* material,
 			const Scene* scene) const;
 
-		uint32_t ao_sample_count_{ 32 };
-		float ao_radius{ 10.f };
+		uint32_t ao_sample_count_{ 1 };
+		float ao_radius_{ 10.f };
 
 		float TraceAO(const ShadingInput& shading_input, uint32_t pixel_index) const;
 		static HemisphereSample UniformSampleHemisphere(const Vector3& normal, uint32_t seed);
 		static HemisphereSample CosineSampleHemisphere(const Vector3& normal, uint32_t seed);
+
+		VisualizationMode last_vis_mode_{};
+		SamplingStrategy last_sampling_strategy_{ SamplingStrategy::kCosine };
+		std::vector<ColorRgba> accumulation_buffer_{};
+
+		Vector2 GenerateSubpixelJitter(uint32_t pixel_index) const;
 
 	public:
 		//--- Construction / Destruction ---
