@@ -104,6 +104,8 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
 		shading_input.world_normal = surface.shading_normal;
 
+		accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene);
+
 		HemisphereSample sample{};
 		switch (context_->debug_params.sampling_strategy)
 		{
