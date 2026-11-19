@@ -101,26 +101,32 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		const uint32_t obj_idx{ hit.object_index };
 		const SceneObject& obj{ scene->objects.at(obj_idx) };
 		const Material* material{ scene->materials_factory.Get(obj.material_index) };
-		const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
+		SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
 		shading_input.world_normal = surface.shading_normal;
-
+		surface.roughness = std::max(surface.roughness, 0.001f);
 		accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene);
 
 		HemisphereSample sample{};
 		switch (context_->debug_params.sampling_strategy)
 		{
+		case SamplingStrategy::kGGX:
+			sample = SampleSpecularOrDiffuse(shading_input, surface, hash_state);
+			break;
 		case SamplingStrategy::kUniform:
 			sample = UniformSampleHemisphere(shading_input.world_normal, hash_state);
+			break;
+		case SamplingStrategy::kCosine:
 		default:
 			sample = CosineSampleHemisphere(shading_input.world_normal, hash_state);
+			break;
+
 		}
 
 		const float n_dot_l{ Vector3::Dot(shading_input.world_normal, sample.direction) };
 		if (n_dot_l <= 0.f || sample.pdf < 1e-6f) break;
 
 		shading_input.light_direction = sample.direction;
-
-		ColorRgba brdf{ material->Shade(shading_input, surface) };
+		shading_input.is_indirect = true;
 		BounceSample bounce_sample{
 			sample.direction,
 			CalcBrdf(material, shading_input, surface) * n_dot_l / sample.pdf
@@ -193,7 +199,7 @@ void SoftwarePathTracer::Render()
 
 	const float aspect_ratio{ static_cast<float>(surface_info.width) / static_cast<float>(surface_info.height) };
 	const float alpha{ active_scene->camera.GetFovAngle() * std::numbers::pi_v<float> / 180.f };
-	const float FOV{ tanf(alpha / 2.f) };
+	const float FOV{ std::tan(alpha / 2.f) };
 
 	const Matrix& camera_view{ active_scene->camera.GetView() };
 
@@ -216,7 +222,7 @@ void SoftwarePathTracer::Render()
 	}
 
 	if (context_->debug_params.accumulated_samples >= context_->debug_params.max_samples ||
-		context_->debug_params.sampling_paused)
+		context_->debug_params.sampling_paused && context_->debug_params.accumulated_samples >= 1)
 		return;
 
 
@@ -251,76 +257,73 @@ void SoftwarePathTracer::Render()
 		{
 			sample_color = TracePath(view_ray, active_scene, hash_state);
 		}
-		else
+		else if (active_scene->SceneClosestHitTest(view_ray, closest_hit_record))
 		{
-			bool did_hit{ active_scene->SceneClosestHitTest(view_ray,closest_hit_record) };
-			if (did_hit)
-			{
-				shading_input = active_scene->ConstructShadingInput(closest_hit_record);
-				const uint32_t obj_idx{ closest_hit_record.object_index };
-				const SceneObject& obj{ active_scene->objects.at(obj_idx) };
-				const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
-				const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
-				shading_input.world_normal = surface.shading_normal;
+			shading_input = active_scene->ConstructShadingInput(closest_hit_record);
+			const uint32_t obj_idx{ closest_hit_record.object_index };
+			const SceneObject& obj{ active_scene->objects.at(obj_idx) };
+			const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
+			const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
+			shading_input.world_normal = surface.shading_normal;
 
-				switch (context_->debug_params.visualization_mode)
-				{
-				case VisualizationMode::kNormals:
-				{
-					const Vector3& n = shading_input.world_normal;
-					sample_color = {
-						(n.x + 1.f) * 0.5f,
-						(n.y + 1.f) * 0.5f,
-						(n.z + 1.f) * 0.5f
-					};
-					break;
-				}
-				case VisualizationMode::kAlbedo:
-				{
-					sample_color = surface.albedo;
-					break;
-				}
-				case VisualizationMode::kDepth:
-				{
-					const float max_depth{ 100.f };
-					const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
-					sample_color = { scaled_t, scaled_t, scaled_t };
-					break;
-				}
-				case VisualizationMode::kUV:
-				{
-					if (!shading_input.texture_coordinates.has_value()) break;
-					sample_color = {
-						shading_input.texture_coordinates.value().x,
-						shading_input.texture_coordinates.value().y,
-						0
-					};
-					break;
-				}
-				case VisualizationMode::kMetallicRoughness:
-				{
-					sample_color = {
-						0.f,
-						surface.roughness,
-						surface.metallic
-					};
-					break;
-				}
-				case VisualizationMode::kDirectOnly:
-				{
-					sample_color = DirectIllumination(shading_input, surface, material, active_scene);
-					break;
-				}
-				case VisualizationMode::kBounceCount:
-				{
-					break;
-				}
-				case VisualizationMode::kMax:
-				{
-					break;
-				}
-				}
+			switch (context_->debug_params.visualization_mode)
+			{
+			case VisualizationMode::kNormals:
+			{
+				const Vector3& n = shading_input.world_normal;
+				sample_color = {
+					(n.x + 1.f) * 0.5f,
+					(n.y + 1.f) * 0.5f,
+					(n.z + 1.f) * 0.5f
+				};
+				break;
 			}
+			case VisualizationMode::kAlbedo:
+			{
+				sample_color = surface.albedo;
+				break;
+			}
+			case VisualizationMode::kDepth:
+			{
+				const float max_depth{ 100.f };
+				const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
+				sample_color = { scaled_t, scaled_t, scaled_t };
+				break;
+			}
+			case VisualizationMode::kUV:
+			{
+				if (!shading_input.texture_coordinates.has_value()) break;
+				sample_color = {
+					shading_input.texture_coordinates.value().x,
+					shading_input.texture_coordinates.value().y,
+					0
+				};
+				break;
+			}
+			case VisualizationMode::kMetallicRoughness:
+			{
+				sample_color = {
+					0.f,
+					surface.roughness,
+					surface.metallic
+				};
+				break;
+			}
+			case VisualizationMode::kDirectOnly:
+			{
+				sample_color = DirectIllumination(shading_input, surface, material, active_scene);
+				break;
+			}
+			case VisualizationMode::kBounceCount:
+			{
+				break;
+			}
+			case VisualizationMode::kMax:
+			{
+				break;
+			}
+			}
+
 		}
 
 		if (!std::isfinite(sample_color.r) || !std::isfinite(sample_color.g) ||

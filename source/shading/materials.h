@@ -35,6 +35,7 @@ namespace gfx
 		std::optional<Vector3> world_tangent{};
 		std::optional<Vector3> world_bitangent{};
 		std::optional<Vector2> texture_coordinates{};
+		bool is_indirect{ false };
 	};
 
 	//--- Alpha Coverage ---
@@ -260,27 +261,24 @@ namespace gfx
 			if (params_.albedo_color_texture.has_value())
 			{
 				const Texture* alb_tex{ textures.Get(params_.albedo_color_texture.value()) };
-				albedo = alb_tex->Sample(input.texture_coordinates.value());
+				albedo *= alb_tex->Sample(input.texture_coordinates.value());
 				if (alb_tex->IsSrgb()) albedo = albedo.ToLinear();
 			};
-			float metallic{ params_.metallic_factor }; 
+			float metallic{ params_.metallic_factor };
 			float roughness{ params_.roughness_factor };
 			if (params_.metallic_roughness_texture.has_value())
 			{
 				const Texture* met_rou_tex{ textures.Get(params_.metallic_roughness_texture.value()) };
 				const ColorRgba metallic_roughness{ met_rou_tex->Sample(input.texture_coordinates.value()) };
-				metallic = metallic_roughness.b;
-				roughness = metallic_roughness.g;
+				metallic *= metallic_roughness.b;
+				roughness *= metallic_roughness.g;
 			};
 
 			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
 			const ColorRgba f0{ ColorRgba::Lerp(ColorRgba(f0_dielectric), albedo, metallic) };
-			
-			Vector3 normal{ input.world_normal };
-			if (params_.normal_texture.has_value())
-			{
-				normal = SampleNormal(params_, input, textures);
-			}
+
+			Vector3 normal{ SampleNormal(params_, input, textures) };
+
 
 			return SurfaceProperties
 			{
@@ -308,10 +306,12 @@ namespace gfx
 			const float r{ surface.roughness };
 			const Vector3 half_vector{ (v + l).Normalized() };
 			const ColorRgba F{ FresnelFunction_Schlick(half_vector, v, surface.f0) };
-			const float D{ NormalDistribution_GGX(n,half_vector,std::powf(r, 2)) };
-			const float G{ GeometryFunction_Smith(n, v, l, r) };
-			const float spec_denom{ 4 * std::max(Vector3::Dot(n,v), 0.f) * std::max(Vector3::Dot(n,l), 0.f) };
-			const ColorRgba specular{ spec_denom <= 0.001f ? ColorRgba{} : (F * D * G) / spec_denom };
+			const float D{ NormalDistribution_GGX(n, half_vector, r) };
+			const float G{ GeometryFunction_Smith(n, v, l, r, input.is_indirect) };
+			const float spec_denom{ 4 * std::max(Vector3::Dot(n, v), 0.f) * std::max(Vector3::Dot(n, l), 0.f) };
+			const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.0001f) };
+			//const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
+
 			ColorRgba kd{ ColorRgba::White() - F };
 			kd *= 1.f - surface.metallic;
 			return Lambert(kd, surface.albedo) + specular;
