@@ -61,6 +61,98 @@ ColorRgba SoftwarePathTracer::CalcDirect(const Light* light, const Vector3& ligh
 	}
 }
 
+ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) const
+{
+	const Scene* scene{ context_->scene_manager->GetActiveScene() };
+	ShadingInput shading_input{};
+	const SceneObject& object{ scene->objects[hit.object_index] };
+	const Ray& ray{ hit.ray };
+	shading_input.view_direction = -ray.direction;
+	shading_input.world_position = ray.origin + ray.direction * hit.t;
+
+
+	const Primitive* prim{ scene->primitives_factory.Get(object.primitive_index) };
+	switch (prim->type)
+	{
+	case PrimitiveType::kSphere:
+	{
+		const Sphere* sphere{ scene->primitives_factory.GetAs<Sphere>(object.primitive_index) };
+		shading_input.world_normal = (shading_input.world_position - sphere->origin).Normalized();
+		shading_input.shadow_origin = shading_input.world_position;
+		break;
+	}
+	case PrimitiveType::kPlane:
+	{
+		const Plane* plane{ scene->primitives_factory.GetAs<Plane>(object.primitive_index) };
+		shading_input.world_normal = plane->normal;
+		shading_input.shadow_origin = shading_input.world_position;
+		break;
+	}
+	case PrimitiveType::kTriangle:
+	{
+		const Triangle* triangle{ scene->primitives_factory.GetAs<Triangle>(object.primitive_index) };
+		shading_input.world_normal = triangle->normal;
+		shading_input.shadow_origin = shading_input.world_position;
+		break;
+	}
+	case PrimitiveType::kTriangleMesh:
+	{
+		const TriangleMesh* triangle_mesh{ scene->primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
+		const Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
+		const Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
+		const Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
+		const Vector3 n0{ v0.normal.value() };
+		const Vector3 n1{ v1.normal.value() };
+		const Vector3 n2{ v2.normal.value() };
+		const float u{ hit.barycentric_coordinates.value()[0] };
+		const float v{ hit.barycentric_coordinates.value()[1] };
+		const float w{ 1 - u - v };
+		shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
+		if (v0.bitangent.has_value() && v1.bitangent.has_value() && v2.bitangent.has_value()
+			&& v0.tangent.has_value() && v1.tangent.has_value() && v2.tangent.has_value())
+		{
+			shading_input.world_bitangent = (w * v0.bitangent.value() + u * v1.bitangent.value() + v * v2.bitangent.value()).Normalized();
+			shading_input.world_tangent = (w * v0.tangent.value() + u * v1.tangent.value() + v * v2.tangent.value()).Normalized();
+		}
+
+		if (v0.texture_coordinates.has_value() && v1.texture_coordinates.has_value() && v2.texture_coordinates.has_value())
+		{
+			const Vector2 t0{ v0.texture_coordinates.value() };
+			const Vector2 t1{ v1.texture_coordinates.value() };
+			const Vector2 t2{ v2.texture_coordinates.value() };
+			shading_input.texture_coordinates.emplace(t0.x * w + t1.x * u + t2.x * v, t0.y * w + t1.y * u + t2.y * v);
+		}
+
+		//shadow
+		Vector3 tmpu{ shading_input.world_position - v0.position };
+		Vector3 tmpv{ shading_input.world_position - v1.position };
+		Vector3 tmpw{ shading_input.world_position - v2.position };
+		const float dotu{ std::min(0.f, Vector3::Dot(tmpu, n0)) };
+		const float dotv{ std::min(0.f, Vector3::Dot(tmpv, n1)) };
+		const float dotw{ std::min(0.f, Vector3::Dot(tmpw, n2)) };
+		tmpu -= dotu * n0;
+		tmpv -= dotv * n1;
+		tmpw -= dotw * n2;
+		const Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
+		shading_input.shadow_origin = shading_input.world_position + w * tmpu + u * tmpv + v * tmpw + face_normal * 0.001f;
+		break;
+	}
+	default:
+		//unhandled case
+		break;
+	}
+
+	if (object.instance_transformation.has_value())
+	{
+		const Matrix& object_transform{ object.instance_transformation.value() };
+		shading_input.world_position = object_transform.TransformPoint(shading_input.world_position);
+		shading_input.world_normal = object_transform.TransformNormal(shading_input.world_normal);
+		shading_input.shadow_origin = object_transform.TransformPoint(shading_input.shadow_origin);
+		shading_input.view_direction = object_transform.TransformVector(shading_input.view_direction).Normalized();
+	}
+	return shading_input;
+}
+
 ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shading_input, const SurfaceProperties& surface, const Material* material, const Scene* scene) const
 {
 	ColorRgba result{ ColorRgba::Black() };
@@ -87,60 +179,85 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 	ColorRgba accumulated_color{ ColorRgba::Black() };
 	ColorRgba throughput{ ColorRgba::White() };
 	Ray current_ray{ ray };
+	MediumState medium{};
 	int bounce{};
 	while (bounce < max_bounces)
 	{
 		RayHitRecord hit{};
-		if (!scene->SceneClosestHitTest(current_ray, hit))
+		if (!scene->SceneClosestHitTest(current_ray, hit, false, medium.inside))
 		{
 			accumulated_color += throughput * EnvironmentRadiance(scene, current_ray.direction);
 			break;
 		}
 
-		ShadingInput shading_input{ scene->ConstructShadingInput(hit) };
+		ShadingInput shading_input{ ConstructShadingInput(hit) };
 		const uint32_t obj_idx{ hit.object_index };
 		const SceneObject& obj{ scene->objects.at(obj_idx) };
 		const Material* material{ scene->materials_factory.Get(obj.material_index) };
 		SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
 		shading_input.world_normal = surface.shading_normal;
 		surface.roughness = std::max(surface.roughness, 0.001f);
-		accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene);
 
-		HemisphereSample sample{};
-		switch (context_->debug_params.sampling_strategy)
+		if (medium.inside && medium.attenuation_distance < std::numeric_limits<float>::max())
 		{
-		case SamplingStrategy::kGGX:
-			sample = SampleSpecularOrDiffuse(shading_input, surface, hash_state);
-			break;
-		case SamplingStrategy::kUniform:
-			sample = UniformSampleHemisphere(shading_input.world_normal, hash_state);
-			break;
-		case SamplingStrategy::kCosine:
-		default:
-			sample = CosineSampleHemisphere(shading_input.world_normal, hash_state);
-			break;
-
+			const float exp{ hit.t / medium.attenuation_distance };
+			throughput *= ColorRgba(
+				std::pow(medium.attenuation_color.r, exp),
+				std::pow(medium.attenuation_color.g, exp),
+				std::pow(medium.attenuation_color.b, exp));
 		}
 
-		const float n_dot_l{ Vector3::Dot(shading_input.world_normal, sample.direction) };
-		if (n_dot_l <= 0.f || sample.pdf < 1e-6f) break;
+		if (surface.transmission <= 0.f)
+			accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene);
 
-		shading_input.light_direction = sample.direction;
-		shading_input.is_indirect = true;
-		BounceSample bounce_sample{
-			sample.direction,
-			CalcBrdf(material, shading_input, surface) * n_dot_l / sample.pdf
-		};
+		BounceSample bounce_sample{};
+		if (surface.transmission > 0.f)
+		{
+			bounce_sample = SampleReflectOrRefract(shading_input, surface, medium, hash_state);
+		}
+		else
+		{
+			HemisphereSample sample{};
+			switch (context_->debug_params.sampling_strategy)
+			{
+			case SamplingStrategy::kGGX:
+				sample = SampleSpecularOrDiffuse(shading_input, surface, hash_state);
+				break;
+			case SamplingStrategy::kUniform:
+				sample = UniformSampleHemisphere(shading_input.world_normal, hash_state);
+				break;
+			case SamplingStrategy::kCosine:
+			default:
+				sample = CosineSampleHemisphere(shading_input.world_normal, hash_state);
+				break;
+			}
+
+			const float n_dot_l{ Vector3::Dot(shading_input.world_normal, sample.direction) };
+			if (n_dot_l <= 0.f || sample.pdf < 1e-6f) break;
+
+			shading_input.light_direction = sample.direction;
+			shading_input.is_indirect = true;
+			bounce_sample.direction = sample.direction;
+			bounce_sample.weight = CalcBrdf(material, shading_input, surface) * n_dot_l / sample.pdf;
+		}
 
 		throughput *= bounce_sample.weight;
 
+		const bool same_side_as_normal{ Vector3::Dot(bounce_sample.direction, shading_input.world_normal) > 0.f };
+
 		current_ray = Ray
 		{
-			shading_input.shadow_origin,
-			sample.direction,
+			same_side_as_normal
+				? shading_input.shadow_origin 
+				: shading_input.world_position - shading_input.world_normal * 0.001f,
+			bounce_sample.direction,
 			0.001f,
 			std::numeric_limits<float>::max()
 		};
+		if (Vector3::Dot(bounce_sample.direction, shading_input.world_normal) < 0.f)
+		{
+			current_ray.origin = shading_input.world_position - shading_input.world_normal * 0.001f;
+		}
 
 		++bounce;
 	}
@@ -174,6 +291,40 @@ Vector2 gfx::SoftwarePathTracer::GenerateSubpixelJitter([[maybe_unused]] uint32_
 	const float jx{ NextFloat(hash_state) };
 	const float jy{ NextFloat(hash_state) };
 	return { jx,jy };
+}
+
+bool gfx::SoftwarePathTracer::IsThinWalled(const SurfaceProperties& surface)
+{
+	return surface.thickness <= 0.f && surface.attenuation_distance >= std::numeric_limits<float>::max();
+}
+
+BounceSample gfx::SoftwarePathTracer::SampleReflectOrRefract(const ShadingInput& input, const SurfaceProperties& surface, MediumState& medium, uint32_t& hash_state)
+{
+	const Vector3 incoming{ -input.view_direction };
+	Vector3 normal{ input.world_normal };
+	if (Vector3::Dot(incoming, normal) > 0.f)
+		normal = -normal;
+	if (IsThinWalled(surface))
+	{
+		if (NextFloat(hash_state) < FresnelFunction_Schlick(normal, input.view_direction, surface.f0).r) //idk about this
+			return { Vector3::Reflect(incoming, normal), ColorRgba::White() };
+		else
+			return { incoming, surface.albedo };
+	}
+
+	const float eta{ medium.inside ? surface.ior : 1.f / surface.ior };
+	const Vector3 refracted{ Vector3::Refract(incoming, normal, eta) };
+	const bool tir{ refracted.SqrMagnitude() < 1e-8f };
+	const Vector3 schlick_dir{ medium.inside ? -refracted : input.view_direction };
+	const float fresnel{ FresnelFunction_Schlick(normal, schlick_dir, surface.f0).r };
+
+	if (tir || NextFloat(hash_state) < fresnel)
+		return { Vector3::Reflect(incoming, normal), ColorRgba::White() };
+
+	medium.inside = !medium.inside;
+	medium.attenuation_color = medium.inside ? surface.attenuation_color : ColorRgba::White();
+	medium.attenuation_distance = medium.inside ? surface.attenuation_distance : std::numeric_limits<float>::max();
+	return { refracted, /*surface.albedo */ ColorRgba::White() };
 }
 
 // =============================================================================
@@ -259,7 +410,7 @@ void SoftwarePathTracer::Render()
 		}
 		else if (active_scene->SceneClosestHitTest(view_ray, closest_hit_record))
 		{
-			shading_input = active_scene->ConstructShadingInput(closest_hit_record);
+			shading_input = ConstructShadingInput(closest_hit_record);
 			const uint32_t obj_idx{ closest_hit_record.object_index };
 			const SceneObject& obj{ active_scene->objects.at(obj_idx) };
 			const Material* material{ active_scene->materials_factory.Get(obj.material_index) };

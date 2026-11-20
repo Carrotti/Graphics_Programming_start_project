@@ -34,14 +34,17 @@ namespace gfx
 		if (od2 > sphere.radius * sphere.radius)
 			return false;
 		const float t_hc{ std::sqrt(sphere.radius * sphere.radius - od2) };
-		const float t{ t_ca - t_hc };
-		const Vector3 p{ ray.origin + t * ray.direction }; //p is intersection point
+		const float t0{ t_ca - t_hc };
+		const float t1{ t_ca + t_hc };
+		const float& t{ t0 >= ray.min ? t0 : t1 };
+		const Vector3 p{ ray.origin + t0 * ray.direction }; //p is intersection point
 
 		if (t < ray.min || t > ray.max) return false;
-		if (ignore_hit_record) return true;
-
-		hit_record.t = t;
-		hit_record.ray = ray;
+		if (!ignore_hit_record)
+		{
+			hit_record.t = t;
+			hit_record.ray = ray;
+		}
 		return true;
 	}
 
@@ -89,13 +92,19 @@ namespace gfx
 
 	[[maybe_unused]]
 	static bool HitTestTriangle(const Triangle& triangle, const Ray& ray,
-		RayHitRecord& hit_record, const bool ignore_hit_record = false)
+		RayHitRecord& hit_record, const bool ignore_hit_record = false, const bool reverse_culling = false)
 	{
 		const float n_dot_v{ Vector3::Dot(triangle.normal, ray.direction) };
+		CullMode cull_mode{ triangle.cull_mode };
+		if (reverse_culling)
+		{
+			if (cull_mode == CullMode::kBackFaceCulling) cull_mode = CullMode::kFrontFaceCulling;
+			if (cull_mode == CullMode::kFrontFaceCulling) cull_mode = CullMode::kBackFaceCulling;
+		}
 
 		if (std::abs(n_dot_v) < std::numeric_limits<float>::epsilon()) return false; //parallel
-		if (triangle.cull_mode == CullMode::kBackFaceCulling && n_dot_v > 0) return false;
-		if (triangle.cull_mode == CullMode::kFrontFaceCulling && n_dot_v < 0) return false;
+		if (cull_mode == CullMode::kBackFaceCulling && n_dot_v > 0) return false;
+		if (cull_mode == CullMode::kFrontFaceCulling && n_dot_v < 0) return false;
 
 
 		//möller trumbone
@@ -166,7 +175,7 @@ namespace gfx
 		const auto update_axis = [&](const float origin,
 			const float direction,
 			const float min_bound,
-			const float max_bound) 
+			const float max_bound)
 			{
 				if (direction == 0.f)
 					return origin >= min_bound && origin <= max_bound;

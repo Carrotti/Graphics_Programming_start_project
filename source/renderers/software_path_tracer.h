@@ -19,6 +19,13 @@ namespace gfx
 		ColorRgba weight{ ColorRgba::Black() };
 	};
 
+	struct MediumState
+	{
+		bool inside{ false };
+		ColorRgba attenuation_color{ ColorRgba::White() };
+		float attenuation_distance{ std::numeric_limits<float>::max() };
+	};
+
 	//--- Software Path Tracer ---
 	class SoftwarePathTracer final : public Renderer
 	{
@@ -29,6 +36,8 @@ namespace gfx
 			const SurfaceProperties& surface);
 		static ColorRgba CalcDirect(const Light* light, const Vector3& light_dir, 
 			float light_dist, const ShadingInput& shading_input, const Scene* scene);
+
+		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const;
 
 		ColorRgba DirectIllumination(const ShadingInput& shading_input,
 			const SurfaceProperties& surface, const Material* material,
@@ -41,7 +50,6 @@ namespace gfx
 		static ColorRgba EnvironmentRadiance(const Scene* scene, const Vector3& direction);
 
 		uint32_t ao_sample_count_{ 1 };
-		float ao_radius_{ 10.f };
 
 
 		VisualizationMode last_vis_mode_{};
@@ -50,6 +58,9 @@ namespace gfx
 		std::vector<ColorRgba> accumulation_buffer_{};
 
 		Vector2 GenerateSubpixelJitter(uint32_t pixel_index, uint32_t& hash_state) const;
+
+		static bool IsThinWalled(const SurfaceProperties& surface);
+		static BounceSample SampleReflectOrRefract(const ShadingInput& input, const SurfaceProperties& surface, MediumState& medium, uint32_t& hash_state);
 
 	public:
 		//--- Construction / Destruction ---

@@ -273,13 +273,21 @@ namespace gfx
 				metallic *= metallic_roughness.b;
 				roughness *= metallic_roughness.g;
 			};
+			float thickness{ params_.thickness_factor };
+			if (params_.thickness_texture.has_value())
+			{
+				const Texture* thickness_texture{ textures.Get(params_.thickness_texture.value()) };
+				thickness *= thickness_texture->Sample(input.texture_coordinates.value()).r;
+			}
+
 
 			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
 			const ColorRgba f0{ ColorRgba::Lerp(ColorRgba(f0_dielectric), albedo, metallic) };
 
 			Vector3 normal{ SampleNormal(params_, input, textures) };
 
-
+			
+			
 			return SurfaceProperties
 			{
 				.albedo = albedo,
@@ -292,7 +300,7 @@ namespace gfx
 				.transmission = params_.transmission_factor,
 				.ior = params_.ior,
 				.attenuation_distance = params_.attenuation_distance,
-				.thickness = params_.thickness_factor,
+				.thickness = thickness,
 				.alpha_params = params_.alpha_params
 			};
 		}
@@ -309,8 +317,8 @@ namespace gfx
 			const float D{ NormalDistribution_GGX(n, half_vector, r) };
 			const float G{ GeometryFunction_Smith(n, v, l, r, input.is_indirect) };
 			const float spec_denom{ 4 * std::max(Vector3::Dot(n, v), 0.f) * std::max(Vector3::Dot(n, l), 0.f) };
-			const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.0001f) };
-			//const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
+			//const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.01f) }; //this one seems to cause grazing angle edges to go completely white
+			const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
 
 			ColorRgba kd{ ColorRgba::White() - F };
 			kd *= 1.f - surface.metallic;
