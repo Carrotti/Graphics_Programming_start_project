@@ -210,6 +210,14 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		if (surface.transmission <= 0.f)
 			accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene);
 
+		if (bounce >= 3)
+		{
+			const float survival_probability{ std::clamp(throughput.Luminance(), 0.05f, 0.95f) };
+			if (NextFloat(hash_state) > survival_probability)
+				break;
+			throughput *= 1 / survival_probability;
+		}
+
 		BounceSample bounce_sample{};
 		if (surface.transmission > 0.f)
 		{
@@ -260,6 +268,16 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		}
 
 		++bounce;
+	}
+
+	if (context_->debug_params.visualization_mode == VisualizationMode::kBounceCount)
+	{
+		constexpr float kHeatmapScale{ 5.f };
+		const float t{ std::clamp(static_cast<float>(bounce) / kHeatmapScale, 0.f, 1.f) };
+		const float r{ std::clamp(2.f * t - 1.f, 0.f, 1.f) };
+		const float g{ t < 0.5f ? 2.f * t : 2.f * (1.f - t) };
+		const float b{ std::clamp(1.f - 2.f * t, 0.f, 1.f) };
+		return ColorRgba(r, g, b);
 	}
 	return accumulated_color;
 }
@@ -404,7 +422,8 @@ void SoftwarePathTracer::Render()
 		ShadingInput shading_input{};
 		ColorRgba sample_color{ active_scene->background_color };
 
-		if (context_->debug_params.visualization_mode == VisualizationMode::kNone)
+		if (context_->debug_params.visualization_mode == VisualizationMode::kNone
+			|| context_->debug_params.visualization_mode == VisualizationMode::kBounceCount)
 		{
 			sample_color = TracePath(view_ray, active_scene, hash_state);
 		}
@@ -463,10 +482,6 @@ void SoftwarePathTracer::Render()
 			case VisualizationMode::kDirectOnly:
 			{
 				sample_color = DirectIllumination(shading_input, surface, material, active_scene);
-				break;
-			}
-			case VisualizationMode::kBounceCount:
-			{
 				break;
 			}
 			case VisualizationMode::kMax:
