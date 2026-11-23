@@ -286,7 +286,12 @@ namespace gfx
 
 			Vector3 normal{ SampleNormal(params_, input, textures) };
 
-			
+			float occlusion{ 1.f };
+			if (params_.occlusion_texture.has_value())
+			{
+				const Texture* occlusion_texture{ textures.Get(params_.occlusion_texture.value()) };
+				occlusion = occlusion_texture->Sample(input.texture_coordinates.value()).r;
+			}
 			
 			return SurfaceProperties
 			{
@@ -299,6 +304,7 @@ namespace gfx
 				.reflectance = params_.reflectance_factor,
 				.transmission = params_.transmission_factor,
 				.ior = params_.ior,
+				.occlusion = occlusion,
 				.attenuation_distance = params_.attenuation_distance,
 				.thickness = thickness,
 				.alpha_params = params_.alpha_params

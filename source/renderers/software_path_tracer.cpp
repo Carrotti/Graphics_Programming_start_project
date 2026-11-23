@@ -35,20 +35,8 @@ ColorRgba SoftwarePathTracer::CalcBrdf(const Material* material, const ShadingIn
 	return material->Shade(input, surface);
 }
 
-ColorRgba SoftwarePathTracer::CalcDirect(const Light* light, const Vector3& light_dir,
-	float light_dist, const ShadingInput& shading_input, const Scene* scene)
+ColorRgba SoftwarePathTracer::CalcRadiance(const Light* light, const ShadingInput& shading_input)
 {
-	//shadow
-	const Ray shadow_ray{
-		shading_input.shadow_origin,
-		light_dir,
-		1e-3f,
-		light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
-	};
-	RayHitRecord hit_record{};
-	if (scene->SceneClosestHitTest(shadow_ray, hit_record, true))
-		return ColorRgba{};
-
 	//radiance - calculate using the light parameters directly
 	switch (light->type)
 	{
@@ -153,7 +141,9 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 	return shading_input;
 }
 
-ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shading_input, const SurfaceProperties& surface, const Material* material, const Scene* scene) const
+ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shading_input, 
+	const SurfaceProperties& surface, const Material* material, 
+	const Scene* scene, uint32_t& hash_state) const
 {
 	ColorRgba result{ ColorRgba::Black() };
 	ShadingInput input{ shading_input };
@@ -166,9 +156,22 @@ ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shadin
 		float light_dist{ light_dir.Normalize() };
 		input.light_direction = light_dir;
 
-		result += CalcDirect(light, light_dir, light_dist, input, scene)
-			* CalcBrdf(material, input, surface)
-			* CalcCosine(surface.shading_normal, light_dir);
+		const Ray shadow_ray{
+			input.shadow_origin,
+			light_dir,
+			1e-3f,
+			light->type == LightType::kDirectional ? std::numeric_limits<float>::max() : light_dist
+		};
+
+		const ColorRgba shadow_transmittance{ ShadowTransmittance(shadow_ray, scene, hash_state) };
+		if (shadow_transmittance.Luminance() < 0.001f) continue;
+		const float cosine{ CalcCosine(surface.shading_normal, light_dir) };
+		if (cosine <= 0.f) continue;
+		const ColorRgba radiance{ CalcRadiance(light, input) };
+		const ColorRgba brdf{ CalcBrdf(material, input, surface) };
+		
+
+		result += shadow_transmittance * radiance * brdf * cosine;
 	}
 
 	return result;
@@ -198,6 +201,13 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		shading_input.world_normal = surface.shading_normal;
 		surface.roughness = std::max(surface.roughness, 0.001f);
 
+		if (IsAlphaSkipped(surface, hash_state))
+		{
+			current_ray.origin += current_ray.direction * (hit.t + 0.001f);
+			--bounce;
+			continue;
+		}
+
 		if (medium.inside && medium.attenuation_distance < std::numeric_limits<float>::max())
 		{
 			const float exp{ hit.t / medium.attenuation_distance };
@@ -208,7 +218,7 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		}
 
 		if (surface.transmission <= 0.f)
-			accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene);
+			accumulated_color += throughput * DirectIllumination(shading_input, surface, material, scene, hash_state);
 
 		if (bounce >= 3)
 		{
@@ -262,10 +272,6 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 			0.001f,
 			std::numeric_limits<float>::max()
 		};
-		if (Vector3::Dot(bounce_sample.direction, shading_input.world_normal) < 0.f)
-		{
-			current_ray.origin = shading_input.world_position - shading_input.world_normal * 0.001f;
-		}
 
 		++bounce;
 	}
@@ -343,6 +349,52 @@ BounceSample gfx::SoftwarePathTracer::SampleReflectOrRefract(const ShadingInput&
 	medium.attenuation_color = medium.inside ? surface.attenuation_color : ColorRgba::White();
 	medium.attenuation_distance = medium.inside ? surface.attenuation_distance : std::numeric_limits<float>::max();
 	return { refracted, /*surface.albedo */ ColorRgba::White() };
+}
+
+bool gfx::SoftwarePathTracer::IsAlphaSkipped(const SurfaceProperties& surface, uint32_t& hash_state)
+{
+	if (surface.transmission > 0.f) return false;
+	switch (surface.alpha_params.mode)
+	{
+	case AlphaMode::kMask:
+		return surface.albedo.a < surface.alpha_params.cutoff;
+	case AlphaMode::kBlend:
+		return surface.albedo.a < NextFloat(hash_state);
+	case AlphaMode::kOpaque:
+	default:
+		return false;
+	}
+}
+
+ColorRgba gfx::SoftwarePathTracer::ShadowTransmittance(const Ray& shadow_ray, const Scene* scene, uint32_t& hash_state) const
+{
+	ColorRgba transmittance{ ColorRgba::White() };
+	Ray ray{ shadow_ray };
+	RayHitRecord hit{};
+	while (scene->SceneClosestHitTest(ray, hit, false))
+	{
+		ShadingInput shading_input{ ConstructShadingInput(hit) };
+		const uint32_t obj_idx{ hit.object_index };
+		const SceneObject& obj{ scene->objects.at(obj_idx) };
+		const Material* material{ scene->materials_factory.Get(obj.material_index) };
+		const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
+		if (!IsAlphaSkipped(surface, hash_state))
+		{
+			if (surface.transmission > 0.f && IsThinWalled(surface))
+			{
+				const float fresnel{ FresnelFunction_Schlick(shading_input.world_normal, -ray.direction, surface.f0).r };
+				transmittance *= surface.albedo * (1.f - fresnel);
+			}
+			else
+				return ColorRgba::Black();
+			if (transmittance.Luminance() < 0.001f)
+				return ColorRgba::Black();
+		}
+		const float traveled{ hit.t + 0.001f };
+		ray.origin += ray.direction * traveled;
+		ray.max -= traveled;
+	}
+	return transmittance;
 }
 
 // =============================================================================
@@ -481,7 +533,7 @@ void SoftwarePathTracer::Render()
 			}
 			case VisualizationMode::kDirectOnly:
 			{
-				sample_color = DirectIllumination(shading_input, surface, material, active_scene);
+				sample_color = DirectIllumination(shading_input, surface, material, active_scene, hash_state);
 				break;
 			}
 			case VisualizationMode::kMax:

@@ -34,15 +34,15 @@ namespace gfx
 		static float CalcCosine(const Vector3& normal, const Vector3& light_dir);
 		static ColorRgba CalcBrdf(const Material* material, const ShadingInput& input, 
 			const SurfaceProperties& surface);
-		static ColorRgba CalcDirect(const Light* light, const Vector3& light_dir, 
-			float light_dist, const ShadingInput& shading_input, const Scene* scene);
+		static ColorRgba CalcRadiance(const Light* light, const ShadingInput& shading_input);
 
 		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const;
 
-		ColorRgba DirectIllumination(const ShadingInput& shading_input,
-			const SurfaceProperties& surface, const Material* material,
-			const Scene* scene) const;
 
+
+		ColorRgba DirectIllumination(const ShadingInput& shading_input, 
+			const SurfaceProperties& surface, const Material* material, 
+			const Scene* scene, uint32_t& hash_state) const;
 
 		ColorRgba TracePath(const Ray& ray, const Scene* scene,
 			uint32_t& hash_state, int max_bounces = 8) const;
@@ -61,6 +61,9 @@ namespace gfx
 
 		static bool IsThinWalled(const SurfaceProperties& surface);
 		static BounceSample SampleReflectOrRefract(const ShadingInput& input, const SurfaceProperties& surface, MediumState& medium, uint32_t& hash_state);
+
+		static bool IsAlphaSkipped(const SurfaceProperties& surface, uint32_t& hash_state);
+		ColorRgba ShadowTransmittance(const Ray& shadow_ray, const Scene* scene, uint32_t& hash_state) const;
 
 	public:
 		//--- Construction / Destruction ---
