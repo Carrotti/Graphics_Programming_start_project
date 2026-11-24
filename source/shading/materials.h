@@ -223,13 +223,20 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
+			ColorRgba albedo{ params_.diffuse_color };
+			if (input.texture_coordinates.has_value() && params_.diffuse_texture.has_value())
+			{
+				const Texture* alb_tex{ textures.Get(params_.diffuse_texture.value()) };
+				ColorRgba tex_albedo{ alb_tex->Sample(input.texture_coordinates.value()) };
+				if (alb_tex->IsSrgb()) tex_albedo = tex_albedo.ToLinear();
+				albedo *= tex_albedo;
+			}
+			
 
-
-			(void)textures;
 			return SurfaceProperties
 			{
-				.albedo = params_.diffuse_color,
-				.shading_normal = input.world_normal,
+				.albedo = albedo,
+				.shading_normal = SampleNormal(params_, input, textures),
 				.reflectance = params_.diffuse_reflectance,
 				.alpha_params = params_.alpha_params
 			};
@@ -255,44 +262,46 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
-
-
 			ColorRgba albedo{ params_.albedo_color_factor };
-			if (params_.albedo_color_texture.has_value())
-			{
-				const Texture* alb_tex{ textures.Get(params_.albedo_color_texture.value()) };
-				albedo *= alb_tex->Sample(input.texture_coordinates.value());
-				if (alb_tex->IsSrgb()) albedo = albedo.ToLinear();
-			};
 			float metallic{ params_.metallic_factor };
 			float roughness{ params_.roughness_factor };
-			if (params_.metallic_roughness_texture.has_value())
-			{
-				const Texture* met_rou_tex{ textures.Get(params_.metallic_roughness_texture.value()) };
-				const ColorRgba metallic_roughness{ met_rou_tex->Sample(input.texture_coordinates.value()) };
-				metallic *= metallic_roughness.b;
-				roughness *= metallic_roughness.g;
-			};
 			float thickness{ params_.thickness_factor };
-			if (params_.thickness_texture.has_value())
-			{
-				const Texture* thickness_texture{ textures.Get(params_.thickness_texture.value()) };
-				thickness *= thickness_texture->Sample(input.texture_coordinates.value()).r;
-			}
+			float occlusion{ 1.f };
 
+			if (input.texture_coordinates.has_value())
+			{
+				if (params_.albedo_color_texture.has_value())
+				{
+					const Texture* alb_tex{ textures.Get(params_.albedo_color_texture.value()) };
+					ColorRgba tex_albedo{ alb_tex->Sample(input.texture_coordinates.value()) };
+					if (alb_tex->IsSrgb()) tex_albedo = tex_albedo.ToLinear();
+					albedo *= tex_albedo;
+				};
+				if (params_.metallic_roughness_texture.has_value())
+				{
+					const Texture* met_rou_tex{ textures.Get(params_.metallic_roughness_texture.value()) };
+					const ColorRgba metallic_roughness{ met_rou_tex->Sample(input.texture_coordinates.value()) };
+					metallic *= metallic_roughness.b;
+					roughness *= metallic_roughness.g;
+				};
+				if (params_.thickness_texture.has_value())
+				{
+					const Texture* thickness_texture{ textures.Get(params_.thickness_texture.value()) };
+					thickness *= thickness_texture->Sample(input.texture_coordinates.value()).g;
+				}
+				if (params_.occlusion_texture.has_value())
+				{
+					const Texture* occlusion_texture{ textures.Get(params_.occlusion_texture.value()) };
+					occlusion *= occlusion_texture->Sample(input.texture_coordinates.value()).r;
+				}
+			}
 
 			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
 			const ColorRgba f0{ ColorRgba::Lerp(ColorRgba(f0_dielectric), albedo, metallic) };
 
 			Vector3 normal{ SampleNormal(params_, input, textures) };
 
-			float occlusion{ 1.f };
-			if (params_.occlusion_texture.has_value())
-			{
-				const Texture* occlusion_texture{ textures.Get(params_.occlusion_texture.value()) };
-				occlusion = occlusion_texture->Sample(input.texture_coordinates.value()).r;
-			}
-			
+
 			return SurfaceProperties
 			{
 				.albedo = albedo,
@@ -323,12 +332,12 @@ namespace gfx
 			const float D{ NormalDistribution_GGX(n, half_vector, r) };
 			const float G{ GeometryFunction_Smith(n, v, l, r, input.is_indirect) };
 			const float spec_denom{ 4 * std::max(Vector3::Dot(n, v), 0.f) * std::max(Vector3::Dot(n, l), 0.f) };
-			//const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.01f) }; //this one seems to cause grazing angle edges to go completely white
+			//const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.0001f) }; //this one seems to cause grazing angle edges to go completely white
 			const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
 
-			ColorRgba kd{ ColorRgba::White() - F };
-			kd *= 1.f - surface.metallic;
-			return Lambert(kd, surface.albedo) + specular;
+			ColorRgba kd{ (ColorRgba::White() - F) * (1.f - surface.metallic) };
+			const ColorRgba diffuse{ Lambert(kd, surface.albedo) };
+			return diffuse + specular;
 		}
 	};
 }

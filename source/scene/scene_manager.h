@@ -79,10 +79,10 @@ namespace gfx
 		bool SceneClosestHitTest(const Ray& ray,
 			RayHitRecord& closest_hit, bool ignore_record = false, bool reverse_culling = false) const
 		{
-			[[maybe_unused]] const bool culling_flag{ reverse_culling };
+			[[maybe_unused]] const bool culling_flag{ reverse_culling || ignore_record };
 
 			bool did_hit_anything{ false };
-			for (int object_index{ 0 }; object_index < objects.size(); object_index++)
+			for (int object_index{}; object_index < objects.size(); ++object_index)
 			{
 				const SceneObject& object{ objects[object_index] };
 				const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
@@ -107,13 +107,13 @@ namespace gfx
 					case PrimitiveType::kSphere:
 					{
 						const Sphere* sphere{ primitives_factory.GetAs<Sphere>(object.primitive_index) };
-						did_hit = HitTestSphere(*sphere, transformed_ray, candidate_closest_hit, ignore_record);
+						did_hit = HitTestSphere(*sphere, transformed_ray, candidate_closest_hit, ignore_record, culling_flag);
 						break;
 					}
 					case PrimitiveType::kPlane:
 					{
 						const Plane* plane{ primitives_factory.GetAs<Plane>(object.primitive_index) };
-						did_hit = HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record);
+						did_hit = HitTestPlane(*plane, transformed_ray, candidate_closest_hit, ignore_record, culling_flag);
 						break;
 					}
 					case PrimitiveType::kTriangle:

@@ -93,7 +93,7 @@ namespace gfx
 	}
 
 	[[maybe_unused]]
-	static HemisphereSample UniformSampleHemisphere(const Vector3& normal, uint32_t& hash_state)
+	static HemisphereSample SampleUniformHemisphere(const Vector3& normal, uint32_t& hash_state)
 	{
 
 		const float u1{ NextFloat(hash_state) };
@@ -109,7 +109,7 @@ namespace gfx
 	}
 
 	[[maybe_unused]]
-	static HemisphereSample CosineSampleHemisphere(const Vector3& normal, uint32_t& hash_state)
+	static HemisphereSample SampleCosineHemisphere(const Vector3& normal, uint32_t& hash_state)
 	{
 		const float u1{ NextFloat(hash_state) };
 		const float u2{ NextFloat(hash_state) };
@@ -148,7 +148,7 @@ namespace gfx
 		const float u{ NextFloat(hash_state) };
 		const Vector3& direction{ u < p ? 
 			SampleGGX(input.world_normal, input.view_direction, surface.roughness, hash_state).direction : 
-			CosineSampleHemisphere(input.world_normal, hash_state).direction };
+			SampleCosineHemisphere(input.world_normal, hash_state).direction };
 		return { direction, PdfSpecularOrDiffuse(input, surface, direction )};
 	}
 }

@@ -24,7 +24,7 @@ namespace gfx
 	//--- Intersection Tests ---
 	[[maybe_unused]]
 	static bool HitTestSphere(const Sphere& sphere, const Ray& ray,
-		RayHitRecord& hit_record, const bool ignore_hit_record = false)
+		RayHitRecord& hit_record, const bool ignore_hit_record = false, bool reverse_culling = false)
 	{
 
 		//using geometric solution
@@ -36,7 +36,7 @@ namespace gfx
 		const float t_hc{ std::sqrt(sphere.radius * sphere.radius - od2) };
 		const float t0{ t_ca - t_hc };
 		const float t1{ t_ca + t_hc };
-		const float& t{ t0 >= ray.min ? t0 : t1 };
+		const float& t{ !reverse_culling ? t0 : t1 };
 		const Vector3 p{ ray.origin + t0 * ray.direction }; //p is intersection point
 
 		if (t < ray.min || t > ray.max) return false;
@@ -50,14 +50,17 @@ namespace gfx
 
 	[[maybe_unused]]
 	static bool HitTestPlane(const Plane& plane, const Ray& ray,
-		RayHitRecord& hit_record, const bool ignore_hit_record = false)
+		RayHitRecord& hit_record, const bool ignore_hit_record = false, bool reverse_culling = false)
 	{
-		const float n_dot_r{ Vector3::Dot(ray.direction, plane.normal) };
+		Vector3 n{ plane.normal };
+		if (reverse_culling) n = -n;
+		const float n_dot_r{ Vector3::Dot(ray.direction, n) };
 		if (std::abs(n_dot_r) < 1e-6f) return false; // ray is parallel to plane
+
 
 		if (!plane.double_sided && n_dot_r >= 0.f) return false; // backface culling
 
-		const float t{ Vector3::Dot(plane.origin - ray.origin, plane.normal) / n_dot_r };
+		const float t{ Vector3::Dot(plane.origin - ray.origin, n) / n_dot_r };
 
 		if (t < ray.min || t > ray.max) return false; // if the plane is behind
 
@@ -74,7 +77,7 @@ namespace gfx
 		{
 			const Vector3 p{ ray.origin + ray.direction * t }; //intersection point
 			const Vector3 op{ p - plane.origin }; //origin to intersect
-			const Vector3 b{ Vector3::Cross(plane.normal, plane.tangent) };//accounting for rotation
+			const Vector3 b{ Vector3::Cross(n, plane.tangent) };//accounting for rotation
 			const float t2{ Vector3::Dot(op,plane.tangent) }; //horizontal distance intersection to origin
 			const float b2{ Vector3::Dot(op,b) }; //vertical distance intersection to origin
 
@@ -99,7 +102,7 @@ namespace gfx
 		if (reverse_culling)
 		{
 			if (cull_mode == CullMode::kBackFaceCulling) cull_mode = CullMode::kFrontFaceCulling;
-			if (cull_mode == CullMode::kFrontFaceCulling) cull_mode = CullMode::kBackFaceCulling;
+			else if (cull_mode == CullMode::kFrontFaceCulling) cull_mode = CullMode::kBackFaceCulling;
 		}
 
 		if (std::abs(n_dot_v) < std::numeric_limits<float>::epsilon()) return false; //parallel
