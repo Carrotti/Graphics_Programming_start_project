@@ -170,9 +170,9 @@ namespace
 int main(int, char**)
 {
 	// Specify settings.
-	constexpr uint32_t width{ 640 };
-	constexpr uint32_t height{ 480 };
-	const char* window_title{ "**Project Name** - **Student Name**" };
+	constexpr uint32_t width{ 320 };
+	constexpr uint32_t height{ 240 };
+	const char* window_title{ "Graphics Programming - Warre Wauters" };
 
 	// Create context and construct objects.
 	Context context{};
@@ -245,7 +245,7 @@ int main(int, char**)
 	context.scene_manager->CreateScene<DragonAttenuationScene>();
 	context.scene_manager->CreateScene<DamagedHelmetScene>();
 	context.scene_manager->CreateScene<PathTraceScene>();
-	//context.scene_manager->CreateScene<ChessScene>();
+	context.scene_manager->CreateScene<ChessScene>();
 	//context.scene_manager->CreateScene<WhiteFurnaceScene>();
 	context.scene_manager->CreateScene<CornellBoxScene>();
 	//context.scene_manager->CreateScene<BunnyScene>();

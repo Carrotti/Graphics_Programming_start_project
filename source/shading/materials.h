@@ -223,13 +223,20 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
+			ColorRgba albedo{ params_.diffuse_color };
+			if (input.texture_coordinates.has_value() && params_.diffuse_texture.has_value())
+			{
+				const Texture* alb_tex{ textures.Get(params_.diffuse_texture.value()) };
+				ColorRgba tex_albedo{ alb_tex->Sample(input.texture_coordinates.value()) };
+				if (alb_tex->IsSrgb()) tex_albedo = tex_albedo.ToLinear();
+				albedo *= tex_albedo;
+			}
+			
 
-
-			(void)textures;
 			return SurfaceProperties
 			{
-				.albedo = params_.diffuse_color,
-				.shading_normal = input.world_normal,
+				.albedo = albedo,
+				.shading_normal = SampleNormal(params_, input, textures),
 				.reflectance = params_.diffuse_reflectance,
 				.alpha_params = params_.alpha_params
 			};
@@ -285,7 +292,7 @@ namespace gfx
 				if (params_.occlusion_texture.has_value())
 				{
 					const Texture* occlusion_texture{ textures.Get(params_.occlusion_texture.value()) };
-					occlusion = occlusion_texture->Sample(input.texture_coordinates.value()).r;
+					occlusion *= occlusion_texture->Sample(input.texture_coordinates.value()).r;
 				}
 			}
 
@@ -325,12 +332,12 @@ namespace gfx
 			const float D{ NormalDistribution_GGX(n, half_vector, r) };
 			const float G{ GeometryFunction_Smith(n, v, l, r, input.is_indirect) };
 			const float spec_denom{ 4 * std::max(Vector3::Dot(n, v), 0.f) * std::max(Vector3::Dot(n, l), 0.f) };
-			//const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.01f) }; //this one seems to cause grazing angle edges to go completely white
-			const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
+			const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.01f) }; //this one seems to cause grazing angle edges to go completely white
+			//const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
 
-			ColorRgba kd{ ColorRgba::White() - F };
-			kd *= 1.f - surface.metallic;
-			return Lambert(kd, surface.albedo) + specular;
+			ColorRgba kd{ (ColorRgba::White() - F) * (1.f - surface.metallic) };
+			const ColorRgba diffuse{ Lambert(kd, surface.albedo) };
+			return diffuse + specular;
 		}
 	};
 }
