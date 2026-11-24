@@ -172,7 +172,7 @@ int main(int, char**)
 	// Specify settings.
 	constexpr uint32_t width{ 640 };
 	constexpr uint32_t height{ 480 };
-	const char* window_title{ "**Project Name** - **Student Name**" };
+	const char* window_title{ "Graphics Programming - Warre Wauters" };
 
 	// Create context and construct objects.
 	Context context{};
@@ -241,15 +241,15 @@ int main(int, char**)
 
 	// Create scenes based on active renderer.
 #if defined(SOFTWARE_PATH_TRACER)
+	context.scene_manager->CreateScene<TriangleScene>();
 	context.scene_manager->CreateScene<AlphaBlendModeTestScene>();
 	context.scene_manager->CreateScene<DragonAttenuationScene>();
 	context.scene_manager->CreateScene<DamagedHelmetScene>();
 	context.scene_manager->CreateScene<PathTraceScene>();
-	//context.scene_manager->CreateScene<ChessScene>();
+	context.scene_manager->CreateScene<ChessScene>();
 	//context.scene_manager->CreateScene<WhiteFurnaceScene>();
 	context.scene_manager->CreateScene<CornellBoxScene>();
 	//context.scene_manager->CreateScene<BunnyScene>();
-	//context.scene_manager->CreateScene<TriangleScene>();
 	//context.scene_manager->CreateScene<InstanceScene>();
 	//context.scene_manager->CreateScene<BasicScene>();
 #elif defined(SOFTWARE_RASTERIZER)

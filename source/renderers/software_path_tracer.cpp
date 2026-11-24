@@ -80,22 +80,33 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 	{
 		const Triangle* triangle{ scene->primitives_factory.GetAs<Triangle>(object.primitive_index) };
 		shading_input.world_normal = triangle->normal;
-		shading_input.shadow_origin = shading_input.world_position;
+		shading_input.shadow_origin = shading_input.world_position;/*
+		if (Vector3::Dot(shading_input.world_normal, -ray.direction) < 0.f)
+			shading_input.world_normal = -shading_input.world_normal;*/
 		break;
 	}
 	case PrimitiveType::kTriangleMesh:
 	{
 		const TriangleMesh* triangle_mesh{ scene->primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
+		
 		const Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
 		const Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
 		const Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
+		
+		Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
+		if (Vector3::Dot(face_normal, -ray.direction) < 0.f) face_normal = -face_normal;
+		
 		const Vector3 n0{ v0.normal.value() };
 		const Vector3 n1{ v1.normal.value() };
 		const Vector3 n2{ v2.normal.value() };
 		const float u{ hit.barycentric_coordinates.value()[0] };
 		const float v{ hit.barycentric_coordinates.value()[1] };
 		const float w{ 1 - u - v };
+
 		shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
+		if (Vector3::Dot(shading_input.world_normal, face_normal) < 0.f)
+			shading_input.world_normal = -shading_input.world_normal;
+
 		if (v0.bitangent.has_value() && v1.bitangent.has_value() && v2.bitangent.has_value()
 			&& v0.tangent.has_value() && v1.tangent.has_value() && v2.tangent.has_value())
 		{
@@ -121,7 +132,6 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 		tmpu -= dotu * n0;
 		tmpv -= dotv * n1;
 		tmpw -= dotw * n2;
-		const Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
 		shading_input.shadow_origin = shading_input.world_position + w * tmpu + u * tmpv + v * tmpw + face_normal * 0.001f;
 		break;
 	}
@@ -199,7 +209,7 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		const Material* material{ scene->materials_factory.Get(obj.material_index) };
 		SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
 		shading_input.world_normal = surface.shading_normal;
-		surface.roughness = std::max(surface.roughness, 0.001f);
+		surface.roughness = std::max(surface.roughness, 0.01f);
 
 		if (IsAlphaSkipped(surface, hash_state))
 		{
@@ -242,11 +252,11 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 				sample = SampleSpecularOrDiffuse(shading_input, surface, hash_state);
 				break;
 			case SamplingStrategy::kUniform:
-				sample = UniformSampleHemisphere(shading_input.world_normal, hash_state);
+				sample = SampleUniformHemisphere(shading_input.world_normal, hash_state);
 				break;
 			case SamplingStrategy::kCosine:
 			default:
-				sample = CosineSampleHemisphere(shading_input.world_normal, hash_state);
+				sample = SampleCosineHemisphere(shading_input.world_normal, hash_state);
 				break;
 			}
 
@@ -331,7 +341,7 @@ BounceSample gfx::SoftwarePathTracer::SampleReflectOrRefract(const ShadingInput&
 		normal = -normal;
 	if (IsThinWalled(surface))
 	{
-		if (NextFloat(hash_state) < FresnelFunction_Schlick(normal, input.view_direction, surface.f0).r) //idk about this
+		if (NextFloat(hash_state) < FresnelFunction_Schlick(normal, input.view_direction, surface.f0).r)
 			return { Vector3::Reflect(incoming, normal), ColorRgba::White() };
 		else
 			return { incoming, surface.albedo };
@@ -341,7 +351,7 @@ BounceSample gfx::SoftwarePathTracer::SampleReflectOrRefract(const ShadingInput&
 	const Vector3 refracted{ Vector3::Refract(incoming, normal, eta) };
 	const bool tir{ refracted.SqrMagnitude() < 1e-8f };
 	const Vector3 schlick_dir{ medium.inside ? -refracted : input.view_direction };
-	const float fresnel{ FresnelFunction_Schlick(normal, schlick_dir, surface.f0).r };
+	const float fresnel{ tir ? 1.f : FresnelFunction_Schlick(normal, schlick_dir, surface.f0).r };
 
 	if (tir || NextFloat(hash_state) < fresnel)
 		return { Vector3::Reflect(incoming, normal), ColorRgba::White() };
@@ -349,7 +359,7 @@ BounceSample gfx::SoftwarePathTracer::SampleReflectOrRefract(const ShadingInput&
 	medium.inside = !medium.inside;
 	medium.attenuation_color = medium.inside ? surface.attenuation_color : ColorRgba::White();
 	medium.attenuation_distance = medium.inside ? surface.attenuation_distance : std::numeric_limits<float>::max();
-	return { refracted, /*surface.albedo */ ColorRgba::White() };
+	return { refracted, surface.albedo };
 }
 
 bool gfx::SoftwarePathTracer::IsAlphaSkipped(const SurfaceProperties& surface, uint32_t& hash_state)
@@ -372,7 +382,7 @@ ColorRgba gfx::SoftwarePathTracer::ShadowTransmittance(const Ray& shadow_ray, co
 	ColorRgba transmittance{ ColorRgba::White() };
 	Ray ray{ shadow_ray };
 	RayHitRecord hit{};
-	while (scene->SceneClosestHitTest(ray, hit, false))
+	while (scene->SceneClosestHitTest(ray, hit, false, true))
 	{
 		ShadingInput shading_input{ ConstructShadingInput(hit) };
 		const uint32_t obj_idx{ hit.object_index };
@@ -385,15 +395,16 @@ ColorRgba gfx::SoftwarePathTracer::ShadowTransmittance(const Ray& shadow_ray, co
 			{
 				const float fresnel{ FresnelFunction_Schlick(shading_input.world_normal, -ray.direction, surface.f0).r };
 				transmittance *= surface.albedo * (1.f - fresnel);
+				if (transmittance.Luminance() < 0.001f)
+					return ColorRgba::Black();
 			}
 			else
-				return ColorRgba::Black();
-			if (transmittance.Luminance() < 0.001f)
 				return ColorRgba::Black();
 		}
 		const float traveled{ hit.t + 0.001f };
 		ray.origin += ray.direction * traveled;
 		ray.max -= traveled;
+		hit = {};
 	}
 	return transmittance;
 }
@@ -475,8 +486,8 @@ void SoftwarePathTracer::Render()
 		ShadingInput shading_input{};
 		ColorRgba sample_color{ active_scene->background_color };
 
-		if (context_->debug_params.visualization_mode == VisualizationMode::kNone
-			|| context_->debug_params.visualization_mode == VisualizationMode::kBounceCount)
+		if (current_vis_mode == VisualizationMode::kNone
+			|| current_vis_mode == VisualizationMode::kBounceCount)
 		{
 			sample_color = TracePath(view_ray, active_scene, hash_state);
 		}
@@ -489,7 +500,7 @@ void SoftwarePathTracer::Render()
 			const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
 			shading_input.world_normal = surface.shading_normal;
 
-			switch (context_->debug_params.visualization_mode)
+			switch (current_vis_mode)
 			{
 			case VisualizationMode::kNormals:
 			{
@@ -581,8 +592,8 @@ void SoftwarePathTracer::Render()
 		ColorRgba final_color{ accumulation_buffer_[pixel_idx] * inv_frames };
 
 
-		if (context_->debug_params.visualization_mode == VisualizationMode::kNone ||
-			context_->debug_params.visualization_mode == VisualizationMode::kDirectOnly)
+		if (current_vis_mode == VisualizationMode::kNone ||
+			current_vis_mode == VisualizationMode::kDirectOnly)
 		{
 			final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
 			final_color = final_color.ToSrgb();
@@ -602,26 +613,9 @@ void SoftwarePathTracer::Render()
 #ifdef _DEBUG
 	std::for_each(std::execution::seq, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
 #else
-	std::for_each(std::execution::par, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
+	std::for_each(std::execution::par_unseq, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
 #endif
 
 	++context_->debug_params.accumulated_samples;
 
-}
-
-ColorRgba gfx::SoftwarePathTracer::CalculateRadiance(const Light* light, const Vector3& world_position)
-{
-	switch (light->type)
-	{
-	case LightType::kPoint:
-	{
-		return light->color * light->intensity / (light->origin - world_position).SqrMagnitude();
-	}
-	case LightType::kDirectional:
-	{
-		return light->color * light->intensity;
-	}
-	default:
-		return ColorRgba{};
-	}
 }
