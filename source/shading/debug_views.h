@@ -29,6 +29,15 @@ namespace gfx
 		kMetallicRoughness,
 		kDirectOnly,
 		kBounceCount,
+		kF0,
+		kAttenuationColor,
+		kReflectance,
+		kTransmission,
+		kIor,
+		kOcclusion,
+		kAttenuationDistance,
+		kThickness,
+		kAlphaParams,
 		kMax
 	};
 
@@ -99,8 +108,27 @@ namespace gfx
 			return "Direct Only";
 		case VisualizationMode::kBounceCount:
 			return "Bounce Count";
+		case VisualizationMode::kF0:
+			return "F0";
+		case VisualizationMode::kAttenuationColor:
+			return "Attenuation Color";
+		case VisualizationMode::kReflectance:
+			return "Reflectance";
+		case VisualizationMode::kTransmission:
+			return "Transmission";
+		case VisualizationMode::kIor:
+			return "Ior";
+		case VisualizationMode::kOcclusion:
+			return "Occlusion";
+		case VisualizationMode::kAttenuationDistance:
+			return "Attenuation Distance";
+		case VisualizationMode::kThickness:
+			return "Thickness";
+		case VisualizationMode::kAlphaParams:
+			return "Alpha Params";
 		case VisualizationMode::kMax:
 			return "";
+
 		}
 		return "";
 	}

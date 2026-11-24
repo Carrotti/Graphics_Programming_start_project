@@ -255,44 +255,46 @@ namespace gfx
 		[[nodiscard]] SurfaceProperties GetSurfaceProperties(const ShadingInput& input,
 			const Factory<Texture>& textures) const override
 		{
-
-
 			ColorRgba albedo{ params_.albedo_color_factor };
-			if (params_.albedo_color_texture.has_value())
-			{
-				const Texture* alb_tex{ textures.Get(params_.albedo_color_texture.value()) };
-				albedo *= alb_tex->Sample(input.texture_coordinates.value());
-				if (alb_tex->IsSrgb()) albedo = albedo.ToLinear();
-			};
 			float metallic{ params_.metallic_factor };
 			float roughness{ params_.roughness_factor };
-			if (params_.metallic_roughness_texture.has_value())
-			{
-				const Texture* met_rou_tex{ textures.Get(params_.metallic_roughness_texture.value()) };
-				const ColorRgba metallic_roughness{ met_rou_tex->Sample(input.texture_coordinates.value()) };
-				metallic *= metallic_roughness.b;
-				roughness *= metallic_roughness.g;
-			};
 			float thickness{ params_.thickness_factor };
-			if (params_.thickness_texture.has_value())
-			{
-				const Texture* thickness_texture{ textures.Get(params_.thickness_texture.value()) };
-				thickness *= thickness_texture->Sample(input.texture_coordinates.value()).r;
-			}
+			float occlusion{ 1.f };
 
+			if (input.texture_coordinates.has_value())
+			{
+				if (params_.albedo_color_texture.has_value())
+				{
+					const Texture* alb_tex{ textures.Get(params_.albedo_color_texture.value()) };
+					ColorRgba tex_albedo{ alb_tex->Sample(input.texture_coordinates.value()) };
+					if (alb_tex->IsSrgb()) tex_albedo = tex_albedo.ToLinear();
+					albedo *= tex_albedo;
+				};
+				if (params_.metallic_roughness_texture.has_value())
+				{
+					const Texture* met_rou_tex{ textures.Get(params_.metallic_roughness_texture.value()) };
+					const ColorRgba metallic_roughness{ met_rou_tex->Sample(input.texture_coordinates.value()) };
+					metallic *= metallic_roughness.b;
+					roughness *= metallic_roughness.g;
+				};
+				if (params_.thickness_texture.has_value())
+				{
+					const Texture* thickness_texture{ textures.Get(params_.thickness_texture.value()) };
+					thickness *= thickness_texture->Sample(input.texture_coordinates.value()).g;
+				}
+				if (params_.occlusion_texture.has_value())
+				{
+					const Texture* occlusion_texture{ textures.Get(params_.occlusion_texture.value()) };
+					occlusion = occlusion_texture->Sample(input.texture_coordinates.value()).r;
+				}
+			}
 
 			const float f0_dielectric{ std::powf((params_.ior - 1.f) / (params_.ior + 1.f), 2) };
 			const ColorRgba f0{ ColorRgba::Lerp(ColorRgba(f0_dielectric), albedo, metallic) };
 
 			Vector3 normal{ SampleNormal(params_, input, textures) };
 
-			float occlusion{ 1.f };
-			if (params_.occlusion_texture.has_value())
-			{
-				const Texture* occlusion_texture{ textures.Get(params_.occlusion_texture.value()) };
-				occlusion = occlusion_texture->Sample(input.texture_coordinates.value()).r;
-			}
-			
+
 			return SurfaceProperties
 			{
 				.albedo = albedo,

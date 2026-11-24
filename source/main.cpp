@@ -245,8 +245,8 @@ int main(int, char**)
 	context.scene_manager->CreateScene<DragonAttenuationScene>();
 	context.scene_manager->CreateScene<DamagedHelmetScene>();
 	context.scene_manager->CreateScene<PathTraceScene>();
-	context.scene_manager->CreateScene<ChessScene>();
-	context.scene_manager->CreateScene<WhiteFurnaceScene>();
+	//context.scene_manager->CreateScene<ChessScene>();
+	//context.scene_manager->CreateScene<WhiteFurnaceScene>();
 	context.scene_manager->CreateScene<CornellBoxScene>();
 	//context.scene_manager->CreateScene<BunnyScene>();
 	//context.scene_manager->CreateScene<TriangleScene>();

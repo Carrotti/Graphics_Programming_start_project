@@ -141,8 +141,8 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 	return shading_input;
 }
 
-ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shading_input, 
-	const SurfaceProperties& surface, const Material* material, 
+ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shading_input,
+	const SurfaceProperties& surface, const Material* material,
 	const Scene* scene, uint32_t& hash_state) const
 {
 	ColorRgba result{ ColorRgba::Black() };
@@ -169,7 +169,7 @@ ColorRgba gfx::SoftwarePathTracer::DirectIllumination(const ShadingInput& shadin
 		if (cosine <= 0.f) continue;
 		const ColorRgba radiance{ CalcRadiance(light, input) };
 		const ColorRgba brdf{ CalcBrdf(material, input, surface) };
-		
+
 
 		result += shadow_transmittance * radiance * brdf * cosine;
 	}
@@ -260,13 +260,14 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		}
 
 		throughput *= bounce_sample.weight;
+		throughput *= std::clamp(surface.occlusion, 0.f, 1.f);
 
 		const bool same_side_as_normal{ Vector3::Dot(bounce_sample.direction, shading_input.world_normal) > 0.f };
 
 		current_ray = Ray
 		{
 			same_side_as_normal
-				? shading_input.shadow_origin 
+				? shading_input.shadow_origin
 				: shading_input.world_position - shading_input.world_normal * 0.001f,
 			bounce_sample.direction,
 			0.001f,
@@ -501,10 +502,8 @@ void SoftwarePathTracer::Render()
 				break;
 			}
 			case VisualizationMode::kAlbedo:
-			{
 				sample_color = surface.albedo;
 				break;
-			}
 			case VisualizationMode::kDepth:
 			{
 				const float max_depth{ 100.f };
@@ -513,7 +512,6 @@ void SoftwarePathTracer::Render()
 				break;
 			}
 			case VisualizationMode::kUV:
-			{
 				if (!shading_input.texture_coordinates.has_value()) break;
 				sample_color = {
 					shading_input.texture_coordinates.value().x,
@@ -521,25 +519,53 @@ void SoftwarePathTracer::Render()
 					0
 				};
 				break;
-			}
 			case VisualizationMode::kMetallicRoughness:
-			{
 				sample_color = {
 					0.f,
 					surface.roughness,
 					surface.metallic
 				};
 				break;
-			}
 			case VisualizationMode::kDirectOnly:
-			{
 				sample_color = DirectIllumination(shading_input, surface, material, active_scene, hash_state);
 				break;
-			}
-			case VisualizationMode::kMax:
+			case VisualizationMode::kF0:
+				sample_color = surface.f0;
+				break;
+			case VisualizationMode::kAttenuationColor:
+				sample_color = surface.attenuation_color;
+				break;
+			case VisualizationMode::kReflectance:
+				sample_color = surface.reflectance;
+				break;
+			case VisualizationMode::kTransmission:
+				sample_color = surface.transmission;
+				break;
+			case VisualizationMode::kIor:
 			{
+				const float max{ 3.f }, min{ 1.f };
+				sample_color = (surface.ior - min) / (max - min);
 				break;
 			}
+			case VisualizationMode::kOcclusion:
+				sample_color = surface.occlusion;
+				break;
+			case VisualizationMode::kAttenuationDistance:
+				sample_color = surface.attenuation_distance;
+				break;
+			case VisualizationMode::kThickness:
+				sample_color = surface.thickness;
+				break;
+			case VisualizationMode::kAlphaParams:
+				if (surface.alpha_params.mode == AlphaMode::kMask)
+					sample_color.r = surface.alpha_params.cutoff;
+				else if (surface.alpha_params.mode == AlphaMode::kBlend)
+					sample_color.g = surface.alpha_params.cutoff;
+				else
+					sample_color.b = surface.alpha_params.cutoff;
+				break;
+			case VisualizationMode::kMax:
+				break;
 			}
 
 		}
