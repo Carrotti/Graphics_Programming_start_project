@@ -80,24 +80,33 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 	{
 		const Triangle* triangle{ scene->primitives_factory.GetAs<Triangle>(object.primitive_index) };
 		shading_input.world_normal = triangle->normal;
-		shading_input.shadow_origin = shading_input.world_position;
+		shading_input.shadow_origin = shading_input.world_position;/*
 		if (Vector3::Dot(shading_input.world_normal, -ray.direction) < 0.f)
-			shading_input.world_normal = -shading_input.world_normal;
+			shading_input.world_normal = -shading_input.world_normal;*/
 		break;
 	}
 	case PrimitiveType::kTriangleMesh:
 	{
 		const TriangleMesh* triangle_mesh{ scene->primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
+		
 		const Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
 		const Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
 		const Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
+		
+		Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
+		if (Vector3::Dot(face_normal, -ray.direction) < 0.f) face_normal = -face_normal;
+		
 		const Vector3 n0{ v0.normal.value() };
 		const Vector3 n1{ v1.normal.value() };
 		const Vector3 n2{ v2.normal.value() };
 		const float u{ hit.barycentric_coordinates.value()[0] };
 		const float v{ hit.barycentric_coordinates.value()[1] };
 		const float w{ 1 - u - v };
+
 		shading_input.world_normal = (w * n0 + u * n1 + v * n2).Normalized();
+		if (Vector3::Dot(shading_input.world_normal, face_normal) < 0.f)
+			shading_input.world_normal = -shading_input.world_normal;
+
 		if (v0.bitangent.has_value() && v1.bitangent.has_value() && v2.bitangent.has_value()
 			&& v0.tangent.has_value() && v1.tangent.has_value() && v2.tangent.has_value())
 		{
@@ -123,7 +132,6 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 		tmpu -= dotu * n0;
 		tmpv -= dotv * n1;
 		tmpw -= dotw * n2;
-		const Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
 		shading_input.shadow_origin = shading_input.world_position + w * tmpu + u * tmpv + v * tmpw + face_normal * 0.001f;
 		break;
 	}
@@ -201,7 +209,7 @@ ColorRgba gfx::SoftwarePathTracer::TracePath(const Ray& ray, const Scene* scene,
 		const Material* material{ scene->materials_factory.Get(obj.material_index) };
 		SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, scene->textures_factory) };
 		shading_input.world_normal = surface.shading_normal;
-		surface.roughness = std::max(surface.roughness, 0.001f);
+		surface.roughness = std::max(surface.roughness, 0.01f);
 
 		if (IsAlphaSkipped(surface, hash_state))
 		{
@@ -396,6 +404,7 @@ ColorRgba gfx::SoftwarePathTracer::ShadowTransmittance(const Ray& shadow_ray, co
 		const float traveled{ hit.t + 0.001f };
 		ray.origin += ray.direction * traveled;
 		ray.max -= traveled;
+		hit = {};
 	}
 	return transmittance;
 }

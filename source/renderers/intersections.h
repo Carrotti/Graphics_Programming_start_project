@@ -102,7 +102,7 @@ namespace gfx
 		if (reverse_culling)
 		{
 			if (cull_mode == CullMode::kBackFaceCulling) cull_mode = CullMode::kFrontFaceCulling;
-			if (cull_mode == CullMode::kFrontFaceCulling) cull_mode = CullMode::kBackFaceCulling;
+			else if (cull_mode == CullMode::kFrontFaceCulling) cull_mode = CullMode::kBackFaceCulling;
 		}
 
 		if (std::abs(n_dot_v) < std::numeric_limits<float>::epsilon()) return false; //parallel

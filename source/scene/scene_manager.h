@@ -82,7 +82,7 @@ namespace gfx
 			[[maybe_unused]] const bool culling_flag{ reverse_culling || ignore_record };
 
 			bool did_hit_anything{ false };
-			for (int object_index{ 0 }; object_index < objects.size(); object_index++)
+			for (int object_index{}; object_index < objects.size(); ++object_index)
 			{
 				const SceneObject& object{ objects[object_index] };
 				const Primitive* prim{ primitives_factory.Get(object.primitive_index) };
