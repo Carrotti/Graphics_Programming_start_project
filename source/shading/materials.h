@@ -332,8 +332,8 @@ namespace gfx
 			const float D{ NormalDistribution_GGX(n, half_vector, r) };
 			const float G{ GeometryFunction_Smith(n, v, l, r, input.is_indirect) };
 			const float spec_denom{ 4 * std::max(Vector3::Dot(n, v), 0.f) * std::max(Vector3::Dot(n, l), 0.f) };
-			const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.0001f) }; //this one seems to cause grazing angle edges to go completely white
-			//const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
+			//const ColorRgba specular{ (F * D * G) / std::max(spec_denom, 0.0001f) }; //this one seems to cause grazing angle edges to go completely white
+			const ColorRgba specular{ spec_denom < 0.001f ? ColorRgba::Black() : (F * D * G) / spec_denom };
 
 			ColorRgba kd{ (ColorRgba::White() - F) * (1.f - surface.metallic) };
 			const ColorRgba diffuse{ Lambert(kd, surface.albedo) };
