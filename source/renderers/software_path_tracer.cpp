@@ -15,6 +15,7 @@
 #include <numbers>
 #include <vector2.h>
 #include <samplers.h>
+#include <chrono>
 
 using namespace gfx;
 
@@ -625,12 +626,12 @@ void SoftwarePathTracer::Render()
 	};
 
 	uint32_t total_indices{ surface_info.height * surface_info.width };
-	auto pixel_indices{ std::views::iota(0u, total_indices) };
 
-	const VisualizationMode current_vis_mode{ context_->debug_params.visualization_mode };
-	const SamplingStrategy current_sampling{ context_->debug_params.sampling_strategy };
-	const ToneMapOperator current_tone_map{ context_->debug_params.tone_map_operator };
-	const BoundingBoxMode current_bounding_box_mode{ context_->debug_params.bounding_box_mode };
+	const DebugParams& debug_params{ context_->debug_params };
+	const VisualizationMode current_vis_mode{ debug_params.visualization_mode };
+	const SamplingStrategy current_sampling{ debug_params.sampling_strategy };
+	const ToneMapOperator current_tone_map{ debug_params.tone_map_operator };
+	const BoundingBoxMode current_bounding_box_mode{ debug_params.bounding_box_mode };
 	if (active_scene->scene_changed || accumulation_buffer_.size() != total_indices ||
 		current_vis_mode != last_vis_mode_ ||
 		current_sampling != last_sampling_strategy_ ||
@@ -643,21 +644,60 @@ void SoftwarePathTracer::Render()
 		last_sampling_strategy_ = current_sampling;
 		last_tone_map = current_tone_map;
 		last_bbox_mode_ = current_bounding_box_mode;
+		pass_done_ = 0;
 	}
 
-	if (context_->debug_params.accumulated_samples >= context_->debug_params.max_samples ||
-		context_->debug_params.sampling_paused && context_->debug_params.accumulated_samples >= 1)
+	if (pass_done_ == 0 &&
+		(debug_params.accumulated_samples >= debug_params.max_samples ||
+		(debug_params.sampling_paused && debug_params.accumulated_samples >= 1)))
 		return;
 
-#ifdef _DEBUG
-	std::for_each(std::execution::seq, pixel_indices.begin(), pixel_indices.end(),
-		[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
-#else
-	std::for_each(std::execution::par_unseq, pixel_indices.begin(), pixel_indices.end(),
-		[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
-#endif
 
-	++context_->debug_params.accumulated_samples;
+
+	using Clock = std::chrono::steady_clock;
+	const auto start{ Clock::now() };
+	constexpr auto time_budget{ std::chrono::milliseconds(16) };
+
+	const uint32_t threads{ std::max(1u, std::thread::hardware_concurrency()) };
+	const uint32_t min_block{ threads * 512 };
+
+	if (block_pixels_ == 0)
+		block_pixels_ = std::max(min_block, surface_info.width * 4);
+
+	while (pass_done_ < total_indices)
+	{
+		const uint32_t count{ std::min({ block_pixels_, total_indices - pass_done_, total_indices - next_pixel_index_ }) };
+		const auto block_start{ Clock::now() };
+		auto block{ std::views::iota(next_pixel_index_, next_pixel_index_ + count) };
+#ifdef _DEBUG
+		std::for_each(std::execution::seq, block.begin(), block.end(), 
+			[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
+#else
+		std::for_each(std::execution::par_unseq, block.begin(), block.end(),
+			[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
+#endif
+		next_pixel_index_ = (next_pixel_index_ + count) % total_indices;
+		pass_done_ += count;
+
+		const double block_ms{ std::chrono::duration<double, std::milli>(Clock::now() - block_start).count() };
+		if (block_ms > 0.0)
+		{
+			const double scale{ std::clamp(3.0 / block_ms, 0.5, 2.0) }; // change gradually
+			block_pixels_ = std::clamp(static_cast<uint32_t>(block_pixels_ * scale),
+				min_block, total_indices);
+			std::cout << "Block time: " << block_ms << " ms, next block size: " << block_pixels_ << std::endl;
+		}
+
+		if (Clock::now() - start >= time_budget)
+			break; // return so main can present what we have so far
+	}
+
+	// Pass finished: count the sample and start the next pass from the top.
+	if (pass_done_ >= total_indices)
+	{
+		pass_done_ = 0;
+		++context_->debug_params.accumulated_samples;
+	}
 }
 
 void gfx::SoftwarePathTracer::PerPixelRender(uint32_t pixel_idx, const FrameData& frame_data)

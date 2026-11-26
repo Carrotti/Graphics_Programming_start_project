@@ -58,8 +58,6 @@ namespace gfx
 
 		static ColorRgba EnvironmentRadiance(const Scene* scene, const Vector3& direction);
 
-		uint32_t ao_sample_count_{ 1 };
-
 
 		VisualizationMode last_vis_mode_{};
 		SamplingStrategy last_sampling_strategy_{ SamplingStrategy::kCosine };
@@ -77,7 +75,9 @@ namespace gfx
 		ColorRgba ShadowTransmittance(const Ray& shadow_ray, const Scene* scene, uint32_t& hash_state) const;
 
 		void PerPixelRender(uint32_t pixel_idx, const FrameData& frame_data);
-
+		uint32_t next_pixel_index_{ 0 };
+		uint32_t pass_done_{ 0 };
+		uint32_t block_pixels_{ 0 };
 
 	public:
 		//--- Construction / Destruction ---
