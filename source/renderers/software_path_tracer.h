@@ -30,6 +30,16 @@ namespace gfx
 	class SoftwarePathTracer final : public Renderer
 	{
 	private:
+		struct FrameData
+		{
+			uint32_t width{};
+			uint32_t height{};
+			float aspect_ratio{};
+			float FOV{};
+			const Scene* scene{};
+			const Matrix& camera_view{};
+		};
+
 		//--- Private Helper Functions ---
 		static float CalcCosine(const Vector3& normal, const Vector3& light_dir);
 		static ColorRgba CalcBrdf(const Material* material, const ShadingInput& input, 
@@ -65,6 +75,9 @@ namespace gfx
 
 		static bool IsAlphaSkipped(const SurfaceProperties& surface, uint32_t& hash_state);
 		ColorRgba ShadowTransmittance(const Ray& shadow_ray, const Scene* scene, uint32_t& hash_state) const;
+
+		void PerPixelRender(uint32_t pixel_idx, const FrameData& frame_data);
+
 
 	public:
 		//--- Construction / Destruction ---

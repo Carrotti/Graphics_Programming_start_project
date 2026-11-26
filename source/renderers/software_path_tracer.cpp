@@ -22,7 +22,7 @@ using namespace gfx;
 // Private Helper Functions
 // =============================================================================
 
-namespace 
+namespace
 {
 	constexpr float kWireframeLineWidthPx{ 1.5f };
 
@@ -270,14 +270,14 @@ ShadingInput SoftwarePathTracer::ConstructShadingInput(const RayHitRecord& hit) 
 	case PrimitiveType::kTriangleMesh:
 	{
 		const TriangleMesh* triangle_mesh{ scene->primitives_factory.GetAs<TriangleMesh>(object.primitive_index) };
-		
+
 		const Vertex v0{ triangle_mesh->vertices[hit.vertex_indices.value()[0]] };
 		const Vertex v1{ triangle_mesh->vertices[hit.vertex_indices.value()[1]] };
 		const Vertex v2{ triangle_mesh->vertices[hit.vertex_indices.value()[2]] };
-		
+
 		Vector3 face_normal{ Vector3::Cross(v1.position - v0.position,v2.position - v0.position).Normalized() };
 		if (Vector3::Dot(face_normal, -ray.direction) < 0.f) face_normal = -face_normal;
-		
+
 		const Vector3 n0{ v0.normal.value() };
 		const Vector3 n1{ v1.normal.value() };
 		const Vector3 n2{ v2.normal.value() };
@@ -591,12 +591,14 @@ ColorRgba gfx::SoftwarePathTracer::ShadowTransmittance(const Ray& shadow_ray, co
 	return transmittance;
 }
 
+
 // =============================================================================
 // Construction / Destruction
 // =============================================================================
 SoftwarePathTracer::SoftwarePathTracer(Context* const context)
 	: Renderer(context)
-{}
+{
+}
 
 SoftwarePathTracer::~SoftwarePathTracer() = default;
 
@@ -607,16 +609,20 @@ void SoftwarePathTracer::Render()
 {
 	assert(context_ && "Context not available!");
 
-	Scene* const active_scene{ context_->scene_manager->GetActiveScene() };
+	Scene* active_scene{ context_->scene_manager->GetActiveScene() };
 	if (!active_scene) return;
 
 	const SurfaceInfo& surface_info = context_->surface_info;
 
-	const float aspect_ratio{ static_cast<float>(surface_info.width) / static_cast<float>(surface_info.height) };
-	const float alpha{ active_scene->camera.GetFovAngle() * std::numbers::pi_v<float> / 180.f };
-	const float FOV{ std::tan(alpha / 2.f) };
-
-	const Matrix& camera_view{ active_scene->camera.GetView() };
+	FrameData frame_data
+	{
+		.width = surface_info.width,
+		.height = surface_info.height,
+		.aspect_ratio = static_cast<float>(surface_info.width) / static_cast<float>(surface_info.height),
+		.FOV = std::tan(active_scene->camera.GetFovAngle() * std::numbers::pi_v<float> / 360.f),
+		.scene = active_scene,
+		.camera_view = active_scene->camera.GetView()
+	};
 
 	uint32_t total_indices{ surface_info.height * surface_info.width };
 	auto pixel_indices{ std::views::iota(0u, total_indices) };
@@ -643,205 +649,207 @@ void SoftwarePathTracer::Render()
 		context_->debug_params.sampling_paused && context_->debug_params.accumulated_samples >= 1)
 		return;
 
-
-	auto per_pixel_fnc = [&](const uint32_t pixel_idx) {
-
-		uint32_t hash_state{ LowBias32(pixel_idx ^ (context_->debug_params.accumulated_samples * 2654435761u)) };
-
-		const uint32_t px{ pixel_idx % surface_info.width };
-		const uint32_t py{ pixel_idx / surface_info.width };
-
-		//middle pixel breakpoint spot
 #ifdef _DEBUG
-		if (px == surface_info.width / 2 && py == surface_info.height / 2)
-		{
-			std::cout << "Middle pixel reached at (" << px << ", " << py << ")" << std::endl;
-		}
-#endif
-
-		//calculate ray using NDC
-		const Vector2 jitter{ GenerateSubpixelJitter(pixel_idx, hash_state) };
-		float x_ndc{ (2.f * ((static_cast<float>(px) + jitter.x) / surface_info.width) - 1.f) * aspect_ratio * FOV };
-		float y_ndc{ (1.f - 2.f * ((static_cast<float>(py) + jitter.y) / surface_info.height)) * FOV };
-		Vector3 ray_direction{ x_ndc, y_ndc, 1 };
-		Ray world_ray{ .direction = ray_direction.Normalized() };
-		Ray view_ray{ camera_view.TransformRay(world_ray) };
-
-		RayHitRecord closest_hit_record{};
-		ShadingInput shading_input{};
-		ColorRgba sample_color{ active_scene->background_color };
-
-		if (current_vis_mode == VisualizationMode::kNone
-			|| current_vis_mode == VisualizationMode::kBounceCount)
-		{
-			sample_color = TracePath(view_ray, active_scene, hash_state);
-		}
-		else if (active_scene->SceneClosestHitTest(view_ray, closest_hit_record))
-		{
-			shading_input = ConstructShadingInput(closest_hit_record);
-			const uint32_t obj_idx{ closest_hit_record.object_index };
-			const SceneObject& obj{ active_scene->objects.at(obj_idx) };
-			const Material* material{ active_scene->materials_factory.Get(obj.material_index) };
-			const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, active_scene->textures_factory) };
-			shading_input.world_normal = surface.shading_normal;
-
-			switch (current_vis_mode)
-			{
-			case VisualizationMode::kNormals:
-			{
-				const Vector3& n = shading_input.world_normal;
-				sample_color = {
-					(n.x + 1.f) * 0.5f,
-					(n.y + 1.f) * 0.5f,
-					(n.z + 1.f) * 0.5f
-				};
-				break;
-			}
-			case VisualizationMode::kAlbedo:
-				sample_color = surface.albedo;
-				break;
-			case VisualizationMode::kDepth:
-			{
-				const float max_depth{ 100.f };
-				const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
-				sample_color = { scaled_t, scaled_t, scaled_t };
-				break;
-			}
-			case VisualizationMode::kUV:
-				if (!shading_input.texture_coordinates.has_value()) break;
-				sample_color = {
-					shading_input.texture_coordinates.value().x,
-					shading_input.texture_coordinates.value().y,
-					0
-				};
-				break;
-			case VisualizationMode::kMetallicRoughness:
-				sample_color = {
-					0.f,
-					surface.roughness,
-					surface.metallic
-				};
-				break;
-			case VisualizationMode::kDirectOnly:
-				sample_color = DirectIllumination(shading_input, surface, material, active_scene, hash_state);
-				break;
-			case VisualizationMode::kF0:
-				sample_color = surface.f0;
-				break;
-			case VisualizationMode::kAttenuationColor:
-				sample_color = surface.attenuation_color;
-				break;
-			case VisualizationMode::kReflectance:
-				sample_color = surface.reflectance;
-				break;
-			case VisualizationMode::kTransmission:
-				sample_color = surface.transmission;
-				break;
-			case VisualizationMode::kIor:
-			{
-				const float max{ 3.f }, min{ 1.f };
-				sample_color = (surface.ior - min) / (max - min);
-				break;
-			}
-			case VisualizationMode::kOcclusion:
-				sample_color = surface.occlusion;
-				break;
-			case VisualizationMode::kAttenuationDistance:
-				sample_color = surface.attenuation_distance;
-				break;
-			case VisualizationMode::kThickness:
-				sample_color = surface.thickness;
-				break;
-			case VisualizationMode::kAlphaParams:
-				if (surface.alpha_params.mode == AlphaMode::kMask)
-					sample_color.r = surface.alpha_params.cutoff;
-				else if (surface.alpha_params.mode == AlphaMode::kBlend)
-					sample_color.g = surface.alpha_params.cutoff;
-				else
-					sample_color.b = surface.alpha_params.cutoff;
-				break;
-			case VisualizationMode::kWireframe:
-			{
-				// World-space size of one pixel at the hit distance.
-				const float pixel_footprint{ 2.f * FOV * closest_hit_record.t
-					/ static_cast<float>(surface_info.height) };
-				// hit.ray is in object space; its direction length encodes the
-				// instance scale, so this converts the footprint to local space.
-				const float local_footprint{ pixel_footprint
-					* closest_hit_record.ray.direction.Magnitude() };
-				const float half_width{ 0.5f * kWireframeLineWidthPx * local_footprint };
-
-				if (IsOnTriangleEdge(active_scene, obj, closest_hit_record, half_width))
-					sample_color = ColorRgba(0.f, 1.f, 0.4f);
-				else
-				{
-					// Dim facing-ratio fill so the silhouette/shape stays readable.
-					const float facing{ std::abs(Vector3::Dot(
-						shading_input.world_normal, shading_input.view_direction)) };
-					sample_color = ColorRgba(0.05f + 0.15f * facing);
-				}
-				break;
-			}
-			case VisualizationMode::kMax:
-				break;
-			}
-
-		}
-
-		if (current_bounding_box_mode != BoundingBoxMode::kOff)
-		{
-			// Depth for occlusion: the path-traced modes don't fill closest_hit_record.
-			float scene_t{ closest_hit_record.t };
-			if (current_vis_mode == VisualizationMode::kNone
-				|| current_vis_mode == VisualizationMode::kBounceCount)
-			{
-				RayHitRecord depth_hit{};
-				if (active_scene->SceneClosestHitTest(view_ray, depth_hit))
-					scene_t = depth_hit.t;
-			}
-
-			const float footprint_per_t{ 2.f * FOV / static_cast<float>(surface_info.height) };
-			ColorRgba overlay_color{};
-			if (BoundingBoxOverlay(active_scene, view_ray, scene_t, footprint_per_t,
-				current_bounding_box_mode, overlay_color))
-				sample_color = overlay_color;
-		}
-
-		if (!std::isfinite(sample_color.r) || !std::isfinite(sample_color.g) ||
-			!std::isfinite(sample_color.b) || !std::isfinite(sample_color.a))
-			sample_color = ColorRgba::Black();
-
-
-		accumulation_buffer_[pixel_idx] += sample_color;
-
-		const float inv_frames{ 1.f / static_cast<float>(context_->debug_params.accumulated_samples + 1.f) };
-		ColorRgba final_color{ accumulation_buffer_[pixel_idx] * inv_frames };
-
-
-		if (current_vis_mode == VisualizationMode::kNone ||
-			current_vis_mode == VisualizationMode::kDirectOnly)
-		{
-			final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
-			final_color = final_color.ToSrgb();
-		}
-
-
-		final_color.Clamp();
-		// Write to surface
-		surface_info.pixel_buffer[px + (py * surface_info.width)] = SDL_MapRGB(
-			surface_info.pixel_format_details, nullptr,
-			static_cast<uint8_t>(final_color.r * 255),
-			static_cast<uint8_t>(final_color.g * 255),
-			static_cast<uint8_t>(final_color.b * 255));
-
-	};
-
-#ifdef _DEBUG
-	std::for_each(std::execution::seq, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
+	std::for_each(std::execution::seq, pixel_indices.begin(), pixel_indices.end(),
+		[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
 #else
-	std::for_each(std::execution::par_unseq, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
+	std::for_each(std::execution::par_unseq, pixel_indices.begin(), pixel_indices.end(),
+		[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
 #endif
 
 	++context_->debug_params.accumulated_samples;
+}
+
+void gfx::SoftwarePathTracer::PerPixelRender(uint32_t pixel_idx, const FrameData& frame_data)
+{
+
+	uint32_t hash_state{ LowBias32(pixel_idx ^ (context_->debug_params.accumulated_samples * 2654435761u)) };
+
+	const uint32_t px{ pixel_idx % frame_data.width };
+	const uint32_t py{ pixel_idx / frame_data.width };
+
+	//middle pixel breakpoint spot
+#ifdef _DEBUG
+	if (px == frame_data.width / 2 && py == frame_data.height / 2)
+	{
+		std::cout << "Middle pixel reached at (" << px << ", " << py << ")" << std::endl;
+	}
+#endif
+
+	//calculate ray using NDC
+	const Vector2 jitter{ GenerateSubpixelJitter(pixel_idx, hash_state) };
+	float x_ndc{ (2.f * ((static_cast<float>(px) + jitter.x) / frame_data.width) - 1.f) * frame_data.aspect_ratio * frame_data.FOV };
+	float y_ndc{ (1.f - 2.f * ((static_cast<float>(py) + jitter.y) / frame_data.height)) * frame_data.FOV };
+	Vector3 ray_direction{ x_ndc, y_ndc, 1 };
+	Ray world_ray{ .direction = ray_direction.Normalized() };
+	Ray view_ray{ frame_data.camera_view.TransformRay(world_ray) };
+
+	RayHitRecord closest_hit_record{};
+	ShadingInput shading_input{};
+	ColorRgba sample_color{ frame_data.scene->background_color };
+
+	if (context_->debug_params.visualization_mode == VisualizationMode::kNone
+		|| context_->debug_params.visualization_mode == VisualizationMode::kBounceCount)
+	{
+		sample_color = TracePath(view_ray, frame_data.scene, hash_state);
+	}
+	else if (frame_data.scene->SceneClosestHitTest(view_ray, closest_hit_record))
+	{
+		shading_input = ConstructShadingInput(closest_hit_record);
+		const uint32_t obj_idx{ closest_hit_record.object_index };
+		const SceneObject& obj{ frame_data.scene->objects.at(obj_idx) };
+		const Material* material{ frame_data.scene->materials_factory.Get(obj.material_index) };
+		const SurfaceProperties surface{ material->GetSurfaceProperties(shading_input, frame_data.scene->textures_factory) };
+		shading_input.world_normal = surface.shading_normal;
+
+		switch (context_->debug_params.visualization_mode)
+		{
+		case VisualizationMode::kNormals:
+		{
+			const Vector3& n = shading_input.world_normal;
+			sample_color = {
+				(n.x + 1.f) * 0.5f,
+				(n.y + 1.f) * 0.5f,
+				(n.z + 1.f) * 0.5f
+			};
+			break;
+		}
+		case VisualizationMode::kAlbedo:
+			sample_color = surface.albedo;
+			break;
+		case VisualizationMode::kDepth:
+		{
+			const float max_depth{ 100.f };
+			const float scaled_t{ 1.f - std::clamp(closest_hit_record.t / max_depth,0.f,1.f) };
+			sample_color = { scaled_t, scaled_t, scaled_t };
+			break;
+		}
+		case VisualizationMode::kUV:
+			if (!shading_input.texture_coordinates.has_value()) break;
+			sample_color = {
+				shading_input.texture_coordinates.value().x,
+				shading_input.texture_coordinates.value().y,
+				0
+			};
+			break;
+		case VisualizationMode::kMetallicRoughness:
+			sample_color = {
+				0.f,
+				surface.roughness,
+				surface.metallic
+			};
+			break;
+		case VisualizationMode::kDirectOnly:
+			sample_color = DirectIllumination(shading_input, surface, material, frame_data.scene, hash_state);
+			break;
+		case VisualizationMode::kF0:
+			sample_color = surface.f0;
+			break;
+		case VisualizationMode::kAttenuationColor:
+			sample_color = surface.attenuation_color;
+			break;
+		case VisualizationMode::kReflectance:
+			sample_color = surface.reflectance;
+			break;
+		case VisualizationMode::kTransmission:
+			sample_color = surface.transmission;
+			break;
+		case VisualizationMode::kIor:
+		{
+			const float max{ 3.f }, min{ 1.f };
+			sample_color = (surface.ior - min) / (max - min);
+			break;
+		}
+		case VisualizationMode::kOcclusion:
+			sample_color = surface.occlusion;
+			break;
+		case VisualizationMode::kAttenuationDistance:
+			sample_color = surface.attenuation_distance;
+			break;
+		case VisualizationMode::kThickness:
+			sample_color = surface.thickness;
+			break;
+		case VisualizationMode::kAlphaParams:
+			if (surface.alpha_params.mode == AlphaMode::kMask)
+				sample_color.r = surface.alpha_params.cutoff;
+			else if (surface.alpha_params.mode == AlphaMode::kBlend)
+				sample_color.g = surface.alpha_params.cutoff;
+			else
+				sample_color.b = surface.alpha_params.cutoff;
+			break;
+		case VisualizationMode::kWireframe:
+		{
+			// World-space size of one pixel at the hit distance.
+			const float pixel_footprint{ 1.f * frame_data.FOV * closest_hit_record.t
+				/ static_cast<float>(frame_data.height) };
+			// hit.ray is in object space; its direction length encodes the
+			// instance scale, so this converts the footprint to local space.
+			const float local_footprint{ pixel_footprint
+				* closest_hit_record.ray.direction.Magnitude() };
+			const float half_width{ 0.5f * kWireframeLineWidthPx * local_footprint };
+
+			if (IsOnTriangleEdge(frame_data.scene, obj, closest_hit_record, half_width))
+				sample_color = ColorRgba(0.f, 1.f, 0.4f);
+			else
+			{
+				// Dim facing-ratio fill so the silhouette/shape stays readable.
+				const float facing{ std::abs(Vector3::Dot(
+					shading_input.world_normal, shading_input.view_direction)) };
+				sample_color = ColorRgba(0.05f + 0.15f * facing);
+			}
+			break;
+		}
+		case VisualizationMode::kMax:
+			break;
+		}
+
+	}
+
+	if (context_->debug_params.bounding_box_mode != BoundingBoxMode::kOff)
+	{
+		// Depth for occlusion: the path-traced modes don't fill closest_hit_record.
+		float scene_t{ closest_hit_record.t };
+		if (context_->debug_params.visualization_mode == VisualizationMode::kNone
+			|| context_->debug_params.visualization_mode == VisualizationMode::kBounceCount)
+		{
+			RayHitRecord depth_hit{};
+			if (frame_data.scene->SceneClosestHitTest(view_ray, depth_hit))
+				scene_t = depth_hit.t;
+		}
+
+		const float footprint_per_t{ 2.f * frame_data.FOV / static_cast<float>(frame_data.height) };
+		ColorRgba overlay_color{};
+		if (BoundingBoxOverlay(frame_data.scene, view_ray, scene_t, footprint_per_t,
+			context_->debug_params.bounding_box_mode, overlay_color))
+			sample_color = overlay_color;
+	}
+
+	if (!std::isfinite(sample_color.r) || !std::isfinite(sample_color.g) ||
+		!std::isfinite(sample_color.b) || !std::isfinite(sample_color.a))
+		sample_color = ColorRgba::Black();
+
+
+	accumulation_buffer_[pixel_idx] += sample_color;
+
+	const float inv_frames{ 1.f / static_cast<float>(context_->debug_params.accumulated_samples + 1.f) };
+	ColorRgba final_color{ accumulation_buffer_[pixel_idx] * inv_frames };
+
+
+
+	if (context_->debug_params.visualization_mode == VisualizationMode::kNone ||
+		context_->debug_params.visualization_mode == VisualizationMode::kDirectOnly)
+	{
+		final_color = final_color.Tonemap(context_->debug_params.tone_map_operator);
+		final_color = final_color.ToSrgb();
+	}
+
+
+	final_color.Clamp();
+	// Write to surface
+	context_->surface_info.pixel_buffer[px + (py * frame_data.width)] = SDL_MapRGB(
+		context_->surface_info.pixel_format_details, nullptr,
+		static_cast<uint8_t>(final_color.r * 255),
+		static_cast<uint8_t>(final_color.g * 255),
+		static_cast<uint8_t>(final_color.b * 255));
 
 }
