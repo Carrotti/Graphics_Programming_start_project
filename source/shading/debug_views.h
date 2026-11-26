@@ -38,6 +38,7 @@ namespace gfx
 		kAttenuationDistance,
 		kThickness,
 		kAlphaParams,
+		kWireframe,
 		kMax
 	};
 
@@ -57,6 +58,15 @@ namespace gfx
 		kMax
 	};
 
+	enum class BoundingBoxMode : uint8_t
+	{
+		kOff,
+		kObjects,
+		kBvhLeaves,
+		kBvhAll,
+		kMax
+	};
+
 	//--- Debug Parameters ---
 	struct DebugParams final
 	{
@@ -70,7 +80,7 @@ namespace gfx
 		bool show_denoised{ false };
 		bool update_active_scene{ true };
 		bool print_timer{ false };
-		bool show_bounding_boxes{ false };
+		BoundingBoxMode bounding_box_mode{ BoundingBoxMode::kOff };
 	};
 
 	//--- Key Bindings ---
@@ -126,6 +136,8 @@ namespace gfx
 			return "Thickness";
 		case VisualizationMode::kAlphaParams:
 			return "Alpha Params";
+		case VisualizationMode::kWireframe:
+			return "Wireframe";
 		case VisualizationMode::kMax:
 			return "";
 
@@ -178,6 +190,24 @@ namespace gfx
 		case ToneMapOperator::kACESHill:
 			return "ACES (Hill)";
 		case ToneMapOperator::kMax:
+			return "";
+		}
+		return "";
+	}
+
+	inline std::string BoundingBoxModeToString(const BoundingBoxMode& mode)
+	{
+		switch (mode)
+		{
+		case BoundingBoxMode::kOff:
+			return "Off";
+		case BoundingBoxMode::kObjects:
+			return "Objects";
+		case BoundingBoxMode::kBvhLeaves:
+			return "BVH Leaves";
+		case BoundingBoxMode::kBvhAll:
+			return "BVH All Nodes";
+		case BoundingBoxMode::kMax:
 			return "";
 		}
 		return "";

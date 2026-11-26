@@ -39,7 +39,6 @@ namespace gfx
 		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const;
 
 
-
 		ColorRgba DirectIllumination(const ShadingInput& shading_input, 
 			const SurfaceProperties& surface, const Material* material, 
 			const Scene* scene, uint32_t& hash_state) const;
@@ -55,6 +54,8 @@ namespace gfx
 		VisualizationMode last_vis_mode_{};
 		SamplingStrategy last_sampling_strategy_{ SamplingStrategy::kCosine };
 		ToneMapOperator last_tone_map{};
+		BoundingBoxMode last_bbox_mode_{};
+
 		std::vector<ColorRgba> accumulation_buffer_{};
 
 		Vector2 GenerateSubpixelJitter(uint32_t pixel_index, uint32_t& hash_state) const;

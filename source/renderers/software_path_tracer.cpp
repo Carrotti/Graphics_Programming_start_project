@@ -22,7 +22,189 @@ using namespace gfx;
 // Private Helper Functions
 // =============================================================================
 
+namespace 
+{
+	constexpr float kWireframeLineWidthPx{ 1.5f };
 
+	// Returns true when the hit point lies within half_width (local space) of
+	// any triangle edge. Works for Triangle and TriangleMesh primitives.
+	bool IsOnTriangleEdge(const Scene* scene, const SceneObject& object,
+		const RayHitRecord& hit, const float half_width)
+	{
+		if (!hit.barycentric_coordinates.has_value()) return false;
+
+		const Primitive* prim{ scene->primitives_factory.Get(object.primitive_index) };
+		Vector3 p0{}, p1{}, p2{};
+		if (prim->type == PrimitiveType::kTriangleMesh && hit.vertex_indices.has_value())
+		{
+			const TriangleMesh* mesh{ static_cast<const TriangleMesh*>(prim) };
+			const auto& idx{ hit.vertex_indices.value() };
+			p0 = mesh->vertices[idx[0]].position;
+			p1 = mesh->vertices[idx[1]].position;
+			p2 = mesh->vertices[idx[2]].position;
+		}
+		else if (prim->type == PrimitiveType::kTriangle)
+		{
+			const Triangle* tri{ static_cast<const Triangle*>(prim) };
+			p0 = tri->v0; p1 = tri->v1; p2 = tri->v2;
+		}
+		else
+			return false; // Spheres/planes have no edges.
+
+		const float u{ hit.barycentric_coordinates.value().x }; // weight of v1
+		const float v{ hit.barycentric_coordinates.value().y }; // weight of v2
+		const float w{ 1.f - u - v };                           // weight of v0
+
+		// Distance from the hit point to the edge opposite a vertex is
+		// (barycentric weight) * (triangle height over that edge),
+		// and height = 2 * area / edge_length.
+		const float two_area{ Vector3::Cross(p1 - p0, p2 - p0).Magnitude() };
+		const float len_12{ (p2 - p1).Magnitude() }; // opposite v0
+		const float len_20{ (p0 - p2).Magnitude() }; // opposite v1
+		const float len_01{ (p1 - p0).Magnitude() }; // opposite v2
+		if (len_12 <= 0.f || len_20 <= 0.f || len_01 <= 0.f) return false;
+
+		const float d0{ w * two_area / len_12 };
+		const float d1{ u * two_area / len_20 };
+		const float d2{ v * two_area / len_01 };
+		return std::min({ d0, d1, d2 }) < half_width;
+	}
+
+	constexpr float kBoxLineWidthPx{ 1.5f };
+
+	// Unclipped slab test: entry and exit parameters of the ray through the box.
+	bool RayBoxInterval(const AABB& box, const Ray& ray, float& t_enter, float& t_exit)
+	{
+		t_enter = std::numeric_limits<float>::lowest();
+		t_exit = std::numeric_limits<float>::max();
+		for (uint8_t a = 0; a < 3; ++a)
+		{
+			if (ray.direction[a] == 0.f)
+			{
+				if (ray.origin[a] < box.min[a] || ray.origin[a] > box.max[a]) return false;
+				continue;
+			}
+			const float inv{ 1.f / ray.direction[a] };
+			float t0{ (box.min[a] - ray.origin[a]) * inv };
+			float t1{ (box.max[a] - ray.origin[a]) * inv };
+			if (t0 > t1) std::swap(t0, t1);
+			t_enter = std::max(t_enter, t0);
+			t_exit = std::min(t_exit, t1);
+			if (t_enter > t_exit) return false;
+		}
+		return t_exit > 0.f;
+	}
+
+	// A point on the box surface is on an edge when it is within h of the
+	// face planes on at least two axes.
+	bool IsBoxEdge(const AABB& box, const Vector3& p, const float h)
+	{
+		int near_faces{ 0 };
+		for (uint8_t a = 0; a < 3; ++a)
+		{
+			if (std::abs(p[a] - box.min[a]) < h || std::abs(p[a] - box.max[a]) < h)
+				++near_faces;
+		}
+		return near_faces >= 2;
+	}
+
+	// Tests the front and back crossing of the box; only crossings in front of
+	// max_t (the current nearest hit) count. Ray is in the box's own space.
+	bool BoxEdgeHit(const AABB& box, const Ray& local_ray, const float max_t,
+		const float footprint_per_t, float& hit_t)
+	{
+		if (!box.IsValid()) return false;
+		float t_enter{}, t_exit{};
+		if (!RayBoxInterval(box, local_ray, t_enter, t_exit)) return false;
+
+		// The ray param t is shared between spaces; the local direction length
+		// converts the world-space pixel footprint to local space.
+		const float dir_len{ local_ray.direction.Magnitude() };
+		for (const float t : { t_enter, t_exit })
+		{
+			if (t < local_ray.min || t >= max_t) continue;
+			const Vector3 p{ local_ray.origin + local_ray.direction * t };
+			const float h{ 0.5f * kBoxLineWidthPx * footprint_per_t * t * dir_len };
+			if (IsBoxEdge(box, p, h))
+			{
+				hit_t = t;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	ColorRgba BvhDepthColor(const uint32_t depth)
+	{
+		static const std::array<ColorRgba, 6> palette{
+			ColorRgba(1.f, 0.2f, 0.2f), ColorRgba(1.f, 0.6f, 0.1f),
+			ColorRgba(0.9f, 0.9f, 0.1f), ColorRgba(0.2f, 0.9f, 0.3f),
+			ColorRgba(0.2f, 0.7f, 1.f), ColorRgba(0.8f, 0.3f, 1.f) };
+		return palette[depth % palette.size()];
+	}
+
+	// Returns true (and the line color) if this pixel's ray crosses a box edge
+	// in front of scene_t.
+	bool BoundingBoxOverlay(const Scene* scene, const Ray& view_ray, const float scene_t,
+		const float footprint_per_t, const BoundingBoxMode mode, ColorRgba& out_color)
+	{
+		float best_t{ scene_t };
+		bool found{ false };
+
+		for (const SceneObject& object : scene->objects)
+		{
+			const Primitive* prim{ scene->primitives_factory.Get(object.primitive_index) };
+			if (!prim || !prim->bounding_box.has_value()) continue;
+
+			const Ray local_ray{ object.instance_transformation.has_value() ?
+				object.instance_transformation->TransformRay(view_ray) : view_ray };
+
+			float t{};
+			if (BoxEdgeHit(prim->bounding_box.value(), local_ray, best_t, footprint_per_t, t))
+			{
+				best_t = t;
+				out_color = ColorRgba(1.f, 0.85f, 0.1f);
+				found = true;
+			}
+
+			if (mode == BoundingBoxMode::kObjects || prim->type != PrimitiveType::kTriangleMesh)
+				continue;
+			const TriangleMesh* mesh{ static_cast<const TriangleMesh*>(prim) };
+			if (mesh->bvh_nodes.empty()) continue;
+
+			// Iterative BVH traversal (node index, depth), pruned by the current nearest hit.
+			std::array<std::pair<uint32_t, uint32_t>, 64> stack{};
+			int sp{ 0 };
+			stack[sp++] = { 0u, 0u };
+			while (sp > 0)
+			{
+				const auto [node_idx, depth] = stack[--sp];
+				const BVHNode& node{ mesh->bvh_nodes[node_idx] };
+
+				Ray cull_ray{ local_ray };
+				cull_ray.max = best_t;
+				if (!HitTestAABB(node.bounds, cull_ray)) continue;
+
+				const bool leaf{ node.IsLeaf() };
+				if (leaf || mode == BoundingBoxMode::kBvhAll)
+				{
+					if (BoxEdgeHit(node.bounds, local_ray, best_t, footprint_per_t, t))
+					{
+						best_t = t;
+						out_color = leaf ? ColorRgba(0.1f, 0.9f, 1.f) : BvhDepthColor(depth);
+						found = true;
+					}
+				}
+				if (!leaf && sp + 2 <= static_cast<int>(stack.size()))
+				{
+					stack[sp++] = { node.left_child, depth + 1 };
+					stack[sp++] = { node.left_child + 1, depth + 1 };
+				}
+			}
+		}
+		return found;
+	}
+}
 
 float SoftwarePathTracer::CalcCosine(const Vector3& normal, const Vector3& light_dir)
 {
@@ -442,16 +624,19 @@ void SoftwarePathTracer::Render()
 	const VisualizationMode current_vis_mode{ context_->debug_params.visualization_mode };
 	const SamplingStrategy current_sampling{ context_->debug_params.sampling_strategy };
 	const ToneMapOperator current_tone_map{ context_->debug_params.tone_map_operator };
+	const BoundingBoxMode current_bounding_box_mode{ context_->debug_params.bounding_box_mode };
 	if (active_scene->scene_changed || accumulation_buffer_.size() != total_indices ||
 		current_vis_mode != last_vis_mode_ ||
 		current_sampling != last_sampling_strategy_ ||
-		current_tone_map != last_tone_map)
+		current_tone_map != last_tone_map ||
+		current_bounding_box_mode != last_bbox_mode_)
 	{
 		context_->debug_params.accumulated_samples = 0;
 		accumulation_buffer_.assign(total_indices, ColorRgba::Black());
 		last_vis_mode_ = current_vis_mode;
 		last_sampling_strategy_ = current_sampling;
 		last_tone_map = current_tone_map;
+		last_bbox_mode_ = current_bounding_box_mode;
 	}
 
 	if (context_->debug_params.accumulated_samples >= context_->debug_params.max_samples ||
@@ -575,10 +760,51 @@ void SoftwarePathTracer::Render()
 				else
 					sample_color.b = surface.alpha_params.cutoff;
 				break;
+			case VisualizationMode::kWireframe:
+			{
+				// World-space size of one pixel at the hit distance.
+				const float pixel_footprint{ 2.f * FOV * closest_hit_record.t
+					/ static_cast<float>(surface_info.height) };
+				// hit.ray is in object space; its direction length encodes the
+				// instance scale, so this converts the footprint to local space.
+				const float local_footprint{ pixel_footprint
+					* closest_hit_record.ray.direction.Magnitude() };
+				const float half_width{ 0.5f * kWireframeLineWidthPx * local_footprint };
+
+				if (IsOnTriangleEdge(active_scene, obj, closest_hit_record, half_width))
+					sample_color = ColorRgba(0.f, 1.f, 0.4f);
+				else
+				{
+					// Dim facing-ratio fill so the silhouette/shape stays readable.
+					const float facing{ std::abs(Vector3::Dot(
+						shading_input.world_normal, shading_input.view_direction)) };
+					sample_color = ColorRgba(0.05f + 0.15f * facing);
+				}
+				break;
+			}
 			case VisualizationMode::kMax:
 				break;
 			}
 
+		}
+
+		if (current_bounding_box_mode != BoundingBoxMode::kOff)
+		{
+			// Depth for occlusion: the path-traced modes don't fill closest_hit_record.
+			float scene_t{ closest_hit_record.t };
+			if (current_vis_mode == VisualizationMode::kNone
+				|| current_vis_mode == VisualizationMode::kBounceCount)
+			{
+				RayHitRecord depth_hit{};
+				if (active_scene->SceneClosestHitTest(view_ray, depth_hit))
+					scene_t = depth_hit.t;
+			}
+
+			const float footprint_per_t{ 2.f * FOV / static_cast<float>(surface_info.height) };
+			ColorRgba overlay_color{};
+			if (BoundingBoxOverlay(active_scene, view_ray, scene_t, footprint_per_t,
+				current_bounding_box_mode, overlay_color))
+				sample_color = overlay_color;
 		}
 
 		if (!std::isfinite(sample_color.r) || !std::isfinite(sample_color.g) ||
@@ -608,7 +834,7 @@ void SoftwarePathTracer::Render()
 			static_cast<uint8_t>(final_color.g * 255),
 			static_cast<uint8_t>(final_color.b * 255));
 
-		};
+	};
 
 #ifdef _DEBUG
 	std::for_each(std::execution::seq, pixel_indices.begin(), pixel_indices.end(), per_pixel_fnc);
