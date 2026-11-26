@@ -649,7 +649,7 @@ void SoftwarePathTracer::Render()
 
 	if (pass_done_ == 0 &&
 		(debug_params.accumulated_samples >= debug_params.max_samples ||
-		(debug_params.sampling_paused && debug_params.accumulated_samples >= 1)))
+			(debug_params.sampling_paused && debug_params.accumulated_samples >= 1)))
 		return;
 
 
@@ -670,7 +670,7 @@ void SoftwarePathTracer::Render()
 		const auto block_start{ Clock::now() };
 		auto block{ std::views::iota(next_pixel_index_, next_pixel_index_ + count) };
 #ifdef _DEBUG
-		std::for_each(std::execution::seq, block.begin(), block.end(), 
+		std::for_each(std::execution::seq, block.begin(), block.end(),
 			[this, &frame_data](uint32_t pixel_idx) {PerPixelRender(pixel_idx, frame_data);});
 #else
 		std::for_each(std::execution::par_unseq, block.begin(), block.end(),
