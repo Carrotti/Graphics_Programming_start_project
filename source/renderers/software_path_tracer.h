@@ -30,6 +30,16 @@ namespace gfx
 	class SoftwarePathTracer final : public Renderer
 	{
 	private:
+		struct FrameData
+		{
+			uint32_t width{};
+			uint32_t height{};
+			float aspect_ratio{};
+			float FOV{};
+			const Scene* scene{};
+			const Matrix& camera_view{};
+		};
+
 		//--- Private Helper Functions ---
 		static float CalcCosine(const Vector3& normal, const Vector3& light_dir);
 		static ColorRgba CalcBrdf(const Material* material, const ShadingInput& input, 
@@ -37,7 +47,6 @@ namespace gfx
 		static ColorRgba CalcRadiance(const Light* light, const ShadingInput& shading_input);
 
 		ShadingInput ConstructShadingInput(const RayHitRecord& hit) const;
-
 
 
 		ColorRgba DirectIllumination(const ShadingInput& shading_input, 
@@ -49,12 +58,12 @@ namespace gfx
 
 		static ColorRgba EnvironmentRadiance(const Scene* scene, const Vector3& direction);
 
-		uint32_t ao_sample_count_{ 1 };
-
 
 		VisualizationMode last_vis_mode_{};
 		SamplingStrategy last_sampling_strategy_{ SamplingStrategy::kCosine };
 		ToneMapOperator last_tone_map{};
+		BoundingBoxMode last_bbox_mode_{};
+
 		std::vector<ColorRgba> accumulation_buffer_{};
 
 		Vector2 GenerateSubpixelJitter(uint32_t pixel_index, uint32_t& hash_state) const;
@@ -64,6 +73,11 @@ namespace gfx
 
 		static bool IsAlphaSkipped(const SurfaceProperties& surface, uint32_t& hash_state);
 		ColorRgba ShadowTransmittance(const Ray& shadow_ray, const Scene* scene, uint32_t& hash_state) const;
+
+		void PerPixelRender(uint32_t pixel_idx, const FrameData& frame_data);
+		uint32_t next_pixel_index_{ 0 };
+		uint32_t pass_done_{ 0 };
+		uint32_t block_pixels_{ 0 };
 
 	public:
 		//--- Construction / Destruction ---
