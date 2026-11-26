@@ -243,7 +243,7 @@ int main(int, char**)
 #if defined(SOFTWARE_PATH_TRACER)
 	//context.scene_manager->CreateScene<TriangleScene>();
 	//context.scene_manager->CreateScene<AlphaBlendModeTestScene>();
-	//context.scene_manager->CreateScene<DragonAttenuationScene>();
+	context.scene_manager->CreateScene<DragonAttenuationScene>();
 	//context.scene_manager->CreateScene<DamagedHelmetScene>();
 	//context.scene_manager->CreateScene<PathTraceScene>();
 	context.scene_manager->CreateScene<ChessScene>();
@@ -252,6 +252,7 @@ int main(int, char**)
 	//context.scene_manager->CreateScene<BunnyScene>();
 	//context.scene_manager->CreateScene<InstanceScene>();
 	//context.scene_manager->CreateScene<BasicScene>();
+	context.scene_manager->CreateScene<RoninScene>();
 #elif defined(SOFTWARE_RASTERIZER)
 #elif defined(HARDWARE_RASTERIZER)
 #endif
