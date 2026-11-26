@@ -22,7 +22,7 @@ namespace gfx
 				context.scene_manager->PreviousScene();
 				context.logger->LogInfo("Changed to previous scene.");
 			}
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F2, "F2: Next Scene", [&context]()
 		{
 			if (context.scene_manager)
@@ -30,7 +30,7 @@ namespace gfx
 				context.scene_manager->NextScene();
 				context.logger->LogInfo("Changed to next scene.");
 			}
-		}});
+		} });
 
 		// --- Path Tracer ---
 		bindings.push_back({ SDL_SCANCODE_F3, "F3: Previous Visualization Mode", [&context]()
@@ -41,7 +41,7 @@ namespace gfx
 				(static_cast<UType>(context.debug_params.visualization_mode) + max - 1) % max);
 			context.logger->LogInfo("Switched to Visualization Mode: {}",
 				VisualizationModeToString(context.debug_params.visualization_mode));
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F4, "F4: Next Visualization Mode", [&context]()
 		{
 			using UType = std::underlying_type_t<VisualizationMode>;
@@ -49,7 +49,7 @@ namespace gfx
 				(static_cast<UType>(context.debug_params.visualization_mode) + 1) % static_cast<UType>(VisualizationMode::kMax));
 			context.logger->LogInfo("Switched to Visualization Mode: {}",
 				VisualizationModeToString(context.debug_params.visualization_mode));
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F5, "F5: Cycle Sampling Strategy (Uniform / Cosine / GGX)", [&context]()
 		{
 			using UType = std::underlying_type_t<SamplingStrategy>;
@@ -57,7 +57,7 @@ namespace gfx
 				(static_cast<UType>(context.debug_params.sampling_strategy) + 1) % static_cast<UType>(SamplingStrategy::kMax));
 			context.logger->LogInfo("Switched to Sampling Strategy: {}",
 				SamplingStrategyToString(context.debug_params.sampling_strategy));
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F6, "F6: Cycle Tone Mapper (None / Reinhard / ACES)", [&context]()
 		{
 			using UType = std::underlying_type_t<ToneMapOperator>;
@@ -65,12 +65,12 @@ namespace gfx
 				(static_cast<UType>(context.debug_params.tone_map_operator) + 1) % static_cast<UType>(ToneMapOperator::kMax));
 			context.logger->LogInfo("Switched to Tone Mapper: {}",
 				ToneMapOperatorToString(context.debug_params.tone_map_operator));
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F7, "F7: Pause/Resume Sampling", [&context]()
 		{
 			context.debug_params.sampling_paused = !context.debug_params.sampling_paused;
 			context.logger->LogInfo("Sampling: {}", context.debug_params.sampling_paused ? "Paused" : "Running");
-		}});
+		} });
 
 		// --- Rasterizer ---
 		bindings.push_back({ SDL_SCANCODE_F8, "F8: Cycle Cull Modes (All Triangle Primitives)", [&context]()
@@ -92,7 +92,7 @@ namespace gfx
 				}
 				context.logger->LogInfo("Changed/Forwarded cull modes of all triangle-based primitives.");
 			}
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F9, "F9: Cycle Filter Mode (Point / Linear / Anisotropic)", [&context]()
 		{
 			using UType = std::underlying_type_t<FilterMode>;
@@ -100,19 +100,27 @@ namespace gfx
 				(static_cast<UType>(context.debug_params.filter_mode) + 1) % static_cast<UType>(FilterMode::kMax));
 			context.logger->LogInfo("Switched to Filter Mode: {}",
 				FilterModeToString(context.debug_params.filter_mode));
-		}});
+		} });
 
 		// --- Shared Utility ---
 		bindings.push_back({ SDL_SCANCODE_F10, "F10: Toggle Scene Updating", [&context]()
 		{
 			context.debug_params.update_active_scene = !context.debug_params.update_active_scene;
 			context.logger->LogInfo("Scene Updating: {}", context.debug_params.update_active_scene);
-		}});
+		} });
 		bindings.push_back({ SDL_SCANCODE_F11, "F11: Toggle Timer Info (every 2 seconds)", [&context]()
 		{
 			context.debug_params.print_timer = !context.debug_params.print_timer;
 			context.logger->LogInfo("Printing Timer: {}", context.debug_params.print_timer);
-		}});
+		} });
+		bindings.push_back({ SDL_SCANCODE_B, "B: Cycle Bounding Box Overlay (Off / Objects / BVH Leaves / BVH All)", [&context]()
+		{
+			using UType = std::underlying_type_t<BoundingBoxMode>;
+			context.debug_params.bounding_box_mode = static_cast<BoundingBoxMode>(
+				(static_cast<UType>(context.debug_params.bounding_box_mode) + 1) % static_cast<UType>(BoundingBoxMode::kMax));
+			context.logger->LogInfo("Bounding Box Overlay: {}",
+			BoundingBoxModeToString(context.debug_params.bounding_box_mode));
+		} });
 		bindings.push_back({ SDL_SCANCODE_P, "", [&context]()
 		{
 			Scene* active_scene = context.scene_manager ? context.scene_manager->GetActiveScene() : nullptr;
@@ -129,7 +137,7 @@ namespace gfx
 				context.logger->LogInfo("camera.Pitch({:.4f}f);", pitch);
 				context.logger->LogInfo("camera.Yaw({:.4f}f);", yaw);
 			}
-		}});
+		} });
 
 		return bindings;
 	}
