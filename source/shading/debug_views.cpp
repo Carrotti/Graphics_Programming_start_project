@@ -121,7 +121,7 @@ namespace gfx
 			context.logger->LogInfo("Bounding Box Overlay: {}",
 			BoundingBoxModeToString(context.debug_params.bounding_box_mode));
 		} });
-		bindings.push_back({ SDL_SCANCODE_P, "", [&context]()
+		bindings.push_back({ SDL_SCANCODE_P, "P: Print Camera Settings", [&context]()
 		{
 			Scene* active_scene = context.scene_manager ? context.scene_manager->GetActiveScene() : nullptr;
 			if (active_scene)

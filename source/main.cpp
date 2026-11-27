@@ -250,7 +250,7 @@ int main(int, char**)
 #if defined(SOFTWARE_PATH_TRACER)
 	//context.scene_manager->CreateScene<TriangleScene>();
 	//context.scene_manager->CreateScene<AlphaBlendModeTestScene>();
-	//context.scene_manager->CreateScene<DragonAttenuationScene>();
+	context.scene_manager->CreateScene<DragonAttenuationScene>();
 	context.scene_manager->CreateScene<DamagedHelmetScene>();
 	//context.scene_manager->CreateScene<PathTraceScene>();
 	context.scene_manager->CreateScene<ChessScene>();

@@ -658,19 +658,19 @@ void SoftwarePathTracer::Render()
 	const auto start{ Clock::now() };
 	constexpr auto time_budget{ std::chrono::milliseconds(16) };
 
+#define _WHOLE_FRAME_RENDER 0
+#if _WHOLE_FRAME_RENDER == 1
+	const uint32_t min_block{ total_indices };
+#else
 	const uint32_t threads{ std::max(1u, std::thread::hardware_concurrency()) };
-	const uint32_t min_block{ threads * 512 };
+	const uint32_t min_block{ threads * 256 };
+#endif
 
 	if (block_pixels_ == 0)
 		block_pixels_ = std::max(min_block, surface_info.width * 4);
 	while (pass_done_ < total_indices)
 	{
-//#define _WHOLE_FRAME_RENDER
-#ifdef _WHOLE_FRAME_RENDER
-		const uint32_t count{ total_indices - pass_done_ };
-#else
 		const uint32_t count{ std::min({ block_pixels_, total_indices - pass_done_, total_indices - next_pixel_index_ }) };
-#endif
 		const auto block_start{ Clock::now() };
 		auto block{ std::views::iota(next_pixel_index_, next_pixel_index_ + count) };
 #ifdef _DEBUG
