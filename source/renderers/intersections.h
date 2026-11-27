@@ -116,7 +116,7 @@ namespace gfx
 
 		const Vector3 h{ Vector3::Cross(ray.direction , e2) };
 		const float det{ Vector3::Dot(h, e1) };
-		if (std::abs(det) < std::numeric_limits<float>::epsilon()) return false;
+		if (det == 0.f) return false;
 		const float inv_det{ 1.f / det };
 		const Vector3 s{ ray.origin - triangle.v0 };
 
