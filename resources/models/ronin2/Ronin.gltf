@@ -12,107 +12,18 @@
 		{
 			"name":"Scene",
 			"nodes":[
-				0,
-				1,
-				2,
-				3,
-				4,
-				5,
-				6,
-				7,
-				8
+				0
 			]
 		}
 	],
 	"nodes":[
 		{
 			"mesh":0,
-			"name":"Object_107",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":1,
-			"name":"Object_109",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":2,
 			"name":"Object_111",
-			"rotation":[
-				-0.7071069478988647,
+			"translation":[
+				0.0216066837310791,
 				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":3,
-			"name":"Object_112",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":4,
-			"name":"Object_114",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":5,
-			"name":"Object_116",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":6,
-			"name":"Object_118",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":7,
-			"name":"Object_120",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
-			]
-		},
-		{
-			"mesh":8,
-			"name":"Object_122",
-			"rotation":[
-				-0.7071069478988647,
-				0,
-				0,
-				0.7071065902709961
+				0
 			]
 		}
 	],
@@ -137,40 +48,17 @@
 					"ior":1000
 				}
 			},
-			"name":"t_cockpit_atlas_01",
-			"pbrMetallicRoughness":{
-				"baseColorTexture":{
-					"index":2
-				},
-				"metallicFactor":0,
-				"metallicRoughnessTexture":{
-					"index":3
-				}
-			}
-		},
-		{
-			"doubleSided":true,
-			"extensions":{
-				"KHR_materials_specular":{
-					"specularColorTexture":{
-						"index":4
-					}
-				},
-				"KHR_materials_ior":{
-					"ior":1000
-				}
-			},
-			"name":"titan_sword_01",
+			"name":"t_l_ronin_warpaint_skin02",
 			"normalTexture":{
-				"index":5
+				"index":2
 			},
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":6
+					"index":3
 				},
 				"metallicFactor":0,
 				"metallicRoughnessTexture":{
-					"index":7
+					"index":4
 				}
 			}
 		},
@@ -182,8 +70,31 @@
 				1
 			],
 			"emissiveTexture":{
-				"index":8
+				"index":5
 			},
+			"extensions":{
+				"KHR_materials_specular":{
+					"specularColorTexture":{
+						"index":6
+					}
+				},
+				"KHR_materials_ior":{
+					"ior":1000
+				}
+			},
+			"name":"t_cockpit_atlas_01",
+			"pbrMetallicRoughness":{
+				"baseColorTexture":{
+					"index":7
+				},
+				"metallicFactor":0,
+				"metallicRoughnessTexture":{
+					"index":8
+				}
+			}
+		},
+		{
+			"doubleSided":true,
 			"extensions":{
 				"KHR_materials_specular":{
 					"specularColorTexture":{
@@ -194,7 +105,7 @@
 					"ior":1000
 				}
 			},
-			"name":"t_l_ronin_warpaint_skin02",
+			"name":"titan_sword_01",
 			"normalTexture":{
 				"index":10
 			},
@@ -211,7 +122,7 @@
 	],
 	"meshes":[
 		{
-			"name":"ronin_body7_model0_t_cockpit_atlas_01_0",
+			"name":"ronin_titan_light_locust_locust_titan_torso_lod0_t_l_ronin_warpaint_skin02_0",
 			"primitives":[
 				{
 					"attributes":{
@@ -221,12 +132,7 @@
 					},
 					"indices":3,
 					"material":0
-				}
-			]
-		},
-		{
-			"name":"ronin_w_titan_sword_lod0_titan_sword_01_0",
-			"primitives":[
+				},
 				{
 					"attributes":{
 						"POSITION":4,
@@ -235,12 +141,7 @@
 					},
 					"indices":7,
 					"material":1
-				}
-			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_torso_lod0_t_l_ronin_warpaint_skin02_0",
-			"primitives":[
+				},
 				{
 					"attributes":{
 						"POSITION":8,
@@ -251,100 +152,12 @@
 					"material":2
 				}
 			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_torso_lod0_t_cockpit_atlas_01_0",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":12,
-						"NORMAL":13,
-						"TEXCOORD_0":14
-					},
-					"indices":15,
-					"material":0
-				}
-			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_r_leg_lod0_t_l_ronin_warpaint_skin02_0",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":16,
-						"NORMAL":17,
-						"TEXCOORD_0":18
-					},
-					"indices":19,
-					"material":2
-				}
-			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_r_arm_lod0_t_l_ronin_warpaint_skin02_0",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":20,
-						"NORMAL":21,
-						"TEXCOORD_0":22
-					},
-					"indices":23,
-					"material":2
-				}
-			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_l_leg_lod0_t_l_ronin_warpaint_skin02_0",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":24,
-						"NORMAL":25,
-						"TEXCOORD_0":26
-					},
-					"indices":27,
-					"material":2
-				}
-			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_l_arm_lod0_t_l_ronin_warpaint_skin02_0",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":28,
-						"NORMAL":29,
-						"TEXCOORD_0":30
-					},
-					"indices":31,
-					"material":2
-				}
-			]
-		},
-		{
-			"name":"ronin_titan_light_locust_locust_titan_hip_lod0_t_l_ronin_warpaint_skin02_0",
-			"primitives":[
-				{
-					"attributes":{
-						"POSITION":32,
-						"NORMAL":33,
-						"TEXCOORD_0":34
-					},
-					"indices":35,
-					"material":2
-				}
-			]
 		}
 	],
 	"textures":[
 		{
 			"sampler":0,
 			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
 		},
 		{
 			"sampler":0,
@@ -372,6 +185,10 @@
 		},
 		{
 			"sampler":0,
+			"source":6
+		},
+		{
+			"sampler":0,
 			"source":7
 		},
 		{
@@ -392,6 +209,31 @@
 		}
 	],
 	"images":[
+		{
+			"mimeType":"image/png",
+			"name":"t_l_ronin_warpaint_skin02_emissive",
+			"uri":"textures/t_l_ronin_warpaint_skin02_emissive.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"t_l_ronin_warpaint_skin02_specularGlossiness",
+			"uri":"textures/t_l_ronin_warpaint_skin02_specularGlossiness.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"t_l_ronin_warpaint_skin02_normal",
+			"uri":"textures/t_l_ronin_warpaint_skin02_normal.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"t_l_ronin_warpaint_skin02_diffuse",
+			"uri":"textures/t_l_ronin_warpaint_skin02_diffuse.png"
+		},
+		{
+			"mimeType":"image/png",
+			"name":"t_l_ronin_warpaint_skin02_specularGlossiness",
+			"uri":"textures/t_l_ronin_warpaint_skin02_specularGlossiness-1.png"
+		},
 		{
 			"mimeType":"image/png",
 			"name":"t_cockpit_atlas_01_emissive",
@@ -426,556 +268,183 @@
 			"mimeType":"image/png",
 			"name":"titan_sword_01_specularGlossiness",
 			"uri":"textures/titan_sword_01_specularGlossiness-1.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"t_l_ronin_warpaint_skin02_emissive",
-			"uri":"textures/t_l_ronin_warpaint_skin02_emissive.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"t_l_ronin_warpaint_skin02_specularGlossiness",
-			"uri":"textures/t_l_ronin_warpaint_skin02_specularGlossiness.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"t_l_ronin_warpaint_skin02_normal",
-			"uri":"textures/t_l_ronin_warpaint_skin02_normal.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"t_l_ronin_warpaint_skin02_diffuse",
-			"uri":"textures/t_l_ronin_warpaint_skin02_diffuse.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"t_l_ronin_warpaint_skin02_specularGlossiness",
-			"uri":"textures/t_l_ronin_warpaint_skin02_specularGlossiness-1.png"
 		}
 	],
 	"accessors":[
 		{
 			"bufferView":0,
 			"componentType":5126,
-			"count":1323,
+			"count":42371,
 			"max":[
-				2.6167469024658203,
-				7.190291404724121,
-				51.70065689086914
+				25.240882873535156,
+				54.98064041137695,
+				15.084177017211914
 			],
 			"min":[
-				-12.08932876586914,
-				-8.45482063293457,
-				36.36166763305664
+				-25.763874053955078,
+				-1.2549322843551636,
+				-16.696269989013672
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":1,
 			"componentType":5126,
-			"count":1323,
+			"count":42371,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":2,
 			"componentType":5126,
-			"count":1323,
+			"count":42371,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":3,
 			"componentType":5123,
-			"count":5370,
+			"count":137379,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":4,
 			"componentType":5126,
-			"count":1858,
+			"count":10119,
 			"max":[
-				-3.004262924194336,
-				-13.426421165466309,
-				76.52558898925781
+				1.0954208374023438,
+				51.584842681884766,
+				4.604272842407227
 			],
 			"min":[
-				-13.63751220703125,
-				-19.032814025878906,
-				29.970264434814453
+				-13.610652923583984,
+				35.64596939086914,
+				-11.545108795166016
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":5,
 			"componentType":5126,
-			"count":1858,
+			"count":10119,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":6,
 			"componentType":5126,
-			"count":1858,
+			"count":10119,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":7,
 			"componentType":5123,
-			"count":5904,
+			"count":34245,
 			"type":"SCALAR"
 		},
 		{
 			"bufferView":8,
 			"componentType":5126,
-			"count":10488,
+			"count":1856,
 			"max":[
-				4.312568664550781,
-				12.594647407531738,
-				55.20405960083008
+				-4.5255889892578125,
+				76.30217742919922,
+				14.931171417236328
 			],
 			"min":[
-				-17.165828704833984,
-				-11.553759574890137,
-				30.852489471435547
+				-15.158836364746094,
+				29.746854782104492,
+				9.324799537658691
 			],
 			"type":"VEC3"
 		},
 		{
 			"bufferView":9,
 			"componentType":5126,
-			"count":10488,
+			"count":1856,
 			"type":"VEC3"
 		},
 		{
 			"bufferView":10,
 			"componentType":5126,
-			"count":10488,
+			"count":1856,
 			"type":"VEC2"
 		},
 		{
 			"bufferView":11,
 			"componentType":5123,
-			"count":35463,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":12,
-			"componentType":5126,
-			"count":8840,
-			"max":[
-				2.314483642578125,
-				7.443482398986816,
-				51.80826187133789
-			],
-			"min":[
-				-12.08932876586914,
-				-8.705899238586426,
-				35.869380950927734
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":13,
-			"componentType":5126,
-			"count":8840,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":14,
-			"componentType":5126,
-			"count":8840,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":15,
-			"componentType":5123,
-			"count":28875,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":16,
-			"componentType":5126,
-			"count":7565,
-			"max":[
-				-5.495652198791504,
-				12.279580116271973,
-				32.92698287963867
-			],
-			"min":[
-				-14.673274993896484,
-				-8.7404203414917,
-				-1.0315132141113281
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":17,
-			"componentType":5126,
-			"count":7565,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":18,
-			"componentType":5126,
-			"count":7565,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":19,
-			"componentType":5123,
-			"count":24078,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":20,
-			"componentType":5126,
-			"count":7408,
-			"max":[
-				-3.588958740234375,
-				2.5688562393188477,
-				44.4855842590332
-			],
-			"min":[
-				-24.242549896240234,
-				-19.185802459716797,
-				36.43948745727539
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":21,
-			"componentType":5126,
-			"count":7408,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":22,
-			"componentType":5126,
-			"count":7408,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":23,
-			"componentType":5123,
-			"count":24033,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":24,
-			"componentType":5126,
-			"count":7678,
-			"max":[
-				26.762210845947266,
-				9.33698558807373,
-				34.55155563354492
-			],
-			"min":[
-				-2.2290830612182617,
-				-5.620495319366455,
-				-0.9209480285644531
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":25,
-			"componentType":5126,
-			"count":7678,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":26,
-			"componentType":5126,
-			"count":7678,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":27,
-			"componentType":5123,
-			"count":24078,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":28,
-			"componentType":5126,
-			"count":7441,
-			"max":[
-				16.15310287475586,
-				7.573250770568848,
-				47.12331008911133
-			],
-			"min":[
-				-7.78823184967041,
-				-17.886878967285156,
-				31.870136260986328
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":29,
-			"componentType":5126,
-			"count":7441,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":30,
-			"componentType":5126,
-			"count":7441,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":31,
-			"componentType":5123,
-			"count":24033,
-			"type":"SCALAR"
-		},
-		{
-			"bufferView":32,
-			"componentType":5126,
-			"count":1787,
-			"max":[
-				1.402536392211914,
-				6.629956245422363,
-				33.132266998291016
-			],
-			"min":[
-				-9.096885681152344,
-				-5.9699320793151855,
-				19.27835464477539
-			],
-			"type":"VEC3"
-		},
-		{
-			"bufferView":33,
-			"componentType":5126,
-			"count":1787,
-			"type":"VEC3"
-		},
-		{
-			"bufferView":34,
-			"componentType":5126,
-			"count":1787,
-			"type":"VEC2"
-		},
-		{
-			"bufferView":35,
-			"componentType":5123,
-			"count":5694,
+			"count":5904,
 			"type":"SCALAR"
 		}
 	],
 	"bufferViews":[
 		{
 			"buffer":0,
-			"byteLength":15876,
+			"byteLength":508452,
 			"byteOffset":0,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":15876,
-			"byteOffset":15876,
+			"byteLength":508452,
+			"byteOffset":508452,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":10584,
-			"byteOffset":31752,
+			"byteLength":338968,
+			"byteOffset":1016904,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":10740,
-			"byteOffset":42336,
+			"byteLength":274758,
+			"byteOffset":1355872,
 			"target":34963
 		},
 		{
 			"buffer":0,
-			"byteLength":22296,
-			"byteOffset":53076,
+			"byteLength":121428,
+			"byteOffset":1630632,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":22296,
-			"byteOffset":75372,
+			"byteLength":121428,
+			"byteOffset":1752060,
 			"target":34962
 		},
 		{
 			"buffer":0,
-			"byteLength":14864,
-			"byteOffset":97668,
+			"byteLength":80952,
+			"byteOffset":1873488,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":68490,
+			"byteOffset":1954440,
+			"target":34963
+		},
+		{
+			"buffer":0,
+			"byteLength":22272,
+			"byteOffset":2022932,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":22272,
+			"byteOffset":2045204,
+			"target":34962
+		},
+		{
+			"buffer":0,
+			"byteLength":14848,
+			"byteOffset":2067476,
 			"target":34962
 		},
 		{
 			"buffer":0,
 			"byteLength":11808,
-			"byteOffset":112532,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":125856,
-			"byteOffset":124340,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":125856,
-			"byteOffset":250196,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":83904,
-			"byteOffset":376052,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":70926,
-			"byteOffset":459956,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":106080,
-			"byteOffset":530884,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":106080,
-			"byteOffset":636964,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":70720,
-			"byteOffset":743044,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":57750,
-			"byteOffset":813764,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":90780,
-			"byteOffset":871516,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":90780,
-			"byteOffset":962296,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":60520,
-			"byteOffset":1053076,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":48156,
-			"byteOffset":1113596,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":88896,
-			"byteOffset":1161752,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":88896,
-			"byteOffset":1250648,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":59264,
-			"byteOffset":1339544,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":48066,
-			"byteOffset":1398808,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":92136,
-			"byteOffset":1446876,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":92136,
-			"byteOffset":1539012,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":61424,
-			"byteOffset":1631148,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":48156,
-			"byteOffset":1692572,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":89292,
-			"byteOffset":1740728,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":89292,
-			"byteOffset":1830020,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":59528,
-			"byteOffset":1919312,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":48066,
-			"byteOffset":1978840,
-			"target":34963
-		},
-		{
-			"buffer":0,
-			"byteLength":21444,
-			"byteOffset":2026908,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":21444,
-			"byteOffset":2048352,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":14296,
-			"byteOffset":2069796,
-			"target":34962
-		},
-		{
-			"buffer":0,
-			"byteLength":11388,
-			"byteOffset":2084092,
+			"byteOffset":2082324,
 			"target":34963
 		}
 	],
@@ -987,7 +456,7 @@
 	],
 	"buffers":[
 		{
-			"byteLength":2095480,
+			"byteLength":2094132,
 			"uri":"Ronin.bin"
 		}
 	]

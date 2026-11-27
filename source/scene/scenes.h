@@ -555,6 +555,43 @@ namespace gfx
 	};
 
 	// -------------------------------------------------------------------------
+	//Makarov
+	// -------------------------------------------------------------------------
+
+	struct MakarovScene final : public Scene
+	{
+		void Setup() override
+		{
+			// Camera setup
+			camera.SetPosition({ 0.598f, 1.643f, -5.160f });
+			camera.SetFovAngle(45.f);
+			camera.Pitch(-0.2040f);
+			camera.Yaw(0.0930f);
+			// HDRI environment map
+			environment_map.emplace(EnvironmentMap{
+				.texture = Texture("resources/textures/hdri/papermill.hdr"),
+				.intensity = 1.0f,
+				.flip_horizontal = true });
+			// Directional lights (matching Khronos sample viewer defaults)
+			lights_factory.Create<Light>(Light{
+				.direction = Vector3(0.5f, -0.7071f, 0.5f).Normalized(),
+				.color = ColorRgba::White(),
+				.intensity = 2.f,
+				.type = LightType::kDirectional });
+			/*lights_factory.Create<Light>(Light{
+				.direction = Vector3(-0.5f, 0.7071f, -0.5f).Normalized(),
+				.color = ColorRgba::White(),
+				.intensity = 1.f,
+				.type = LightType::kDirectional });*/
+			// Load Ronin glTF
+			AssetLoader loader{};
+			loader.Load("resources/models/makarov_pm/scene.gltf",
+				*this, false, std::numeric_limits<uint32_t>::max(),
+				true, true);
+		}
+	};
+
+	// -------------------------------------------------------------------------
 	// ChessScene: "A Beautiful Game" glTF chess set with glass pawn tops.
 	// Uses KHR_materials_transmission for path-traced glass refraction.
 	// -------------------------------------------------------------------------
