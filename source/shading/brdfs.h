@@ -58,7 +58,7 @@ namespace gfx
 	static float NormalDistribution_GGX(const Vector3& n, const Vector3& h, const float roughness)
 	{
 		const float alpha2{ std::powf(std::powf(roughness, 2), 2) };
-		const float n_dot_h{ Vector3::Dot(n, h) };
+		const float n_dot_h{ std::max(Vector3::Dot(n, h), 0.f) };
 		const float denom{
 			std::numbers::pi_v<float> *
 			std::powf(
@@ -84,7 +84,7 @@ namespace gfx
 		const float k{ is_indirect ?
 			std::powf(roughness, 2) / 2.f :
 			std::powf(roughness + 1, 2) / 8.f };
-		const float n_dot_v{ Vector3::Dot(n, v) };
+		const float n_dot_v{ std::max(Vector3::Dot(n, v), 0.f) };
 		return n_dot_v / (n_dot_v * (1 - k) + k);
 	}
 

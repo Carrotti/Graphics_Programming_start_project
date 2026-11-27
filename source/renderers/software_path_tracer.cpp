@@ -665,7 +665,7 @@ void SoftwarePathTracer::Render()
 		block_pixels_ = std::max(min_block, surface_info.width * 4);
 	while (pass_done_ < total_indices)
 	{
-#define _WHOLE_FRAME_RENDER
+//#define _WHOLE_FRAME_RENDER
 #ifdef _WHOLE_FRAME_RENDER
 		const uint32_t count{ total_indices - pass_done_ };
 #else

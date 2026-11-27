@@ -171,7 +171,7 @@ int main(int, char**)
 {
 	// Specify settings.
 
-#define _FULL_HD_RENDER
+//#define _FULL_HD_RENDER 0
 #ifdef _FULL_HD_RENDER
 	constexpr uint32_t width{ 1920 };
 	constexpr uint32_t height{ 1080 };
@@ -250,16 +250,17 @@ int main(int, char**)
 #if defined(SOFTWARE_PATH_TRACER)
 	//context.scene_manager->CreateScene<TriangleScene>();
 	//context.scene_manager->CreateScene<AlphaBlendModeTestScene>();
-	context.scene_manager->CreateScene<DragonAttenuationScene>();
-	//context.scene_manager->CreateScene<DamagedHelmetScene>();
+	//context.scene_manager->CreateScene<DragonAttenuationScene>();
+	context.scene_manager->CreateScene<DamagedHelmetScene>();
 	//context.scene_manager->CreateScene<PathTraceScene>();
 	context.scene_manager->CreateScene<ChessScene>();
 	//context.scene_manager->CreateScene<WhiteFurnaceScene>();
-	//context.scene_manager->CreateScene<CornellBoxScene>();
+	context.scene_manager->CreateScene<CornellBoxScene>();
 	//context.scene_manager->CreateScene<BunnyScene>();
 	//context.scene_manager->CreateScene<InstanceScene>();
 	//context.scene_manager->CreateScene<BasicScene>();
 	context.scene_manager->CreateScene<RoninScene>();
+	context.scene_manager->CreateScene<MakarovScene>();
 #elif defined(SOFTWARE_RASTERIZER)
 #elif defined(HARDWARE_RASTERIZER)
 #endif
