@@ -548,7 +548,7 @@ namespace gfx
 				.type = LightType::kDirectional });
 			// Load Ronin glTF
 			AssetLoader loader{};
-			loader.Load("resources/models/titanfall_2_ronin/scene.gltf",
+			loader.Load("resources/models/ronin2/Ronin.gltf",
 				*this, false, std::numeric_limits<uint32_t>::max(),
 				true, true);
 		}
