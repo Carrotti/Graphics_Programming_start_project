@@ -663,10 +663,14 @@ void SoftwarePathTracer::Render()
 
 	if (block_pixels_ == 0)
 		block_pixels_ = std::max(min_block, surface_info.width * 4);
-
 	while (pass_done_ < total_indices)
 	{
+#define _WHOLE_FRAME_RENDER
+#ifdef _WHOLE_FRAME_RENDER
+		const uint32_t count{ total_indices - pass_done_ };
+#else
 		const uint32_t count{ std::min({ block_pixels_, total_indices - pass_done_, total_indices - next_pixel_index_ }) };
+#endif
 		const auto block_start{ Clock::now() };
 		auto block{ std::views::iota(next_pixel_index_, next_pixel_index_ + count) };
 #ifdef _DEBUG
@@ -685,7 +689,8 @@ void SoftwarePathTracer::Render()
 			const double scale{ std::clamp(3.0 / block_ms, 0.5, 2.0) }; // change gradually
 			block_pixels_ = std::clamp(static_cast<uint32_t>(block_pixels_ * scale),
 				min_block, total_indices);
-			std::cout << "Block time: " << block_ms << " ms, next block size: " << block_pixels_ << std::endl;
+			if (context_->debug_params.print_timer)
+				std::cout << "Block time: " << block_ms << " ms, next block size: " << block_pixels_ << std::endl;
 		}
 
 		if (Clock::now() - start >= time_budget)
@@ -698,6 +703,7 @@ void SoftwarePathTracer::Render()
 		pass_done_ = 0;
 		++context_->debug_params.accumulated_samples;
 	}
+	//todo: performance oscilation
 }
 
 void gfx::SoftwarePathTracer::PerPixelRender(uint32_t pixel_idx, const FrameData& frame_data)

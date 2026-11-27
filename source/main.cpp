@@ -170,8 +170,15 @@ namespace
 int main(int, char**)
 {
 	// Specify settings.
+
+#define _FULL_HD_RENDER
+#ifdef _FULL_HD_RENDER
+	constexpr uint32_t width{ 1920 };
+	constexpr uint32_t height{ 1080 };
+#else
 	constexpr uint32_t width{ 640 };
 	constexpr uint32_t height{ 480 };
+#endif // _FULL_HD_RENDER
 	const char* window_title{ "Graphics Programming - Warre Wauters" };
 
 	// Create context and construct objects.
